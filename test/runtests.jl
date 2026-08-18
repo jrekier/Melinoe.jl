@@ -32,11 +32,15 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         @test isnan(love_numbers(dahlenize(Kelvin())).l)
 
         # (b) solid, μ̃ → 0: shear traction pins it ⇒ (3/4)/(1+μ̃).
+        # l is the worst conditioned of the three and degrades another order of
+        # magnitude as μ̃ → 0, where the problem is nearly degenerate — hence the
+        # looser bound there. All three also move by ~10× that error between BLAS
+        # implementations, so these tolerances leave room for the platform spread.
         for μ̃ in (1.0, 1e-2, 1e-4)
             ln = love_numbers(Kelvin(μ̃ = μ̃, κ̃ = 1e8))
-            @test -ln.h * (1 + μ̃) ≈ 2.50 atol = 1e-5
-            @test -ln.l * (1 + μ̃) ≈ 0.75 atol = 1e-4
-            @test  ln.k * (1 + μ̃) ≈ 1.50 atol = 1e-5
+            @test -ln.h * (1 + μ̃) ≈ 2.50 atol = 1e-4
+            @test -ln.l * (1 + μ̃) ≈ 0.75 atol = (μ̃ ≥ 1e-2 ? 1e-4 : 5e-3)
+            @test  ln.k * (1 + μ̃) ≈ 1.50 atol = 1e-4
         end
 
         # (c) fluid, ω² → 0⁺: inertia pins it ⇒ 5/4. A different limit from (b).
@@ -134,9 +138,11 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         Ω̂² = (rotation_rate(m) / m.ω_unit)^2
         tide = forced(m, Tide());  cent = forced(m, Centrifugal())
         both = forced(m, Tide() + Centrifugal())
-        # one solve of the sum == sum of the solves (the operator is linear)
+        # one solve of the sum == sum of the solves (the operator is linear).
+        # Relative, not absolute: the two sides are separate solves, so they differ
+        # by conditioning × eps — ~1e-9 relative, and that varies across platforms.
         @test surface_potential(both) ≈
-              surface_potential(tide) + surface_potential(cent) atol = 1e-12
+              surface_potential(tide) + surface_potential(cent) rtol = 1e-8
         # Centrifugal is exactly Potential(r²) at amplitude Ω̂²/3
         @test surface_potential(cent) ==
               surface_potential(forced(m, Potential(r -> r^2; amplitude = Ω̂²/3)))
@@ -183,11 +189,12 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
 
     @testset "Dahlen-reduced fluid == standard, and restores Betti" begin
         # On a neutral (AW, N²=0) core the two formulations are the same physics,
-        # so they must agree to solver precision.
+        # so they must agree to solver precision — two different assemblies, so
+        # ~1e-9 relative, not machine epsilon.
         m = prem(); md = dahlenize(m)
         ln, lnd = love_numbers(m), love_numbers(md)
-        @test lnd.h ≈ ln.h atol = 1e-11
-        @test lnd.k ≈ ln.k atol = 1e-11
+        @test lnd.h ≈ ln.h rtol = 1e-8
+        @test lnd.k ≈ ln.k rtol = 1e-8
         # ...and the Dahlen form is well posed at a solid wall, so its reciprocity
         # residual sits at machine precision rather than the Longman floor.
         cd = compliances(md; core_layer = 2)
@@ -226,7 +233,9 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         @test c.ξ ≈ 2.241380e-4 atol = 5e-7   #                            0.222e-3
         @test c.γ ≈ 1.984454e-3 atol = 5e-6   #                            1.965e-3
         @test c.β ≈ 6.226327e-4 atol = 5e-7   #                            0.616e-3
-        @test abs(c.betti) < 1e-9             # Â_tot·ξ = Â_f·γ (Saito eq. 58)
+        # Â_tot·ξ = Â_f·γ (Saito eq. 58). The standard formulation's residual is
+        # conditioning-limited, not exact — contrast the dahlenized 1e-12 above.
+        @test abs(c.betti) < 1e-7
         @test c.k₂ ≈ 3 * c.δφ_s1 / (rotation_rate(m)/m.ω_unit)^2 atol = 1e-14
     end
 
