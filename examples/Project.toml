@@ -1,0 +1,9 @@
+[deps]
+ApproxFun = "28f2ccd6-bb30-5033-b560-165f7b14dc2f"
+Melinoe = "f46d905b-24f8-47e9-9657-d7baf27a5618"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+
+# Melinoe is not registered; point at the checkout one directory up (Julia ≥ 1.11)
+[sources]
+Melinoe = {path = ".."}

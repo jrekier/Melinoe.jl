@@ -1,0 +1,38 @@
+.DS_Store
+*.png
+/Manifest.toml
+# personal Claude Code settings, not shared
+.claude/settings.local.json
+
+# local scratch — regenerable / superseded / personal, kept out of the package
+/_attic/
+/research/
+/scratch/
+/figures/
+
+# internal author notes + probe scripts — kept locally, not shipped as package docs
+/docs/internal/
+
+# data — colleague model CSVs + Mathematica research generators, all local
+/data/
+
+# sibling dev projects (separate, unported — not part of this package)
+/rotating-modes/
+/eigenmethods-beyn/
+
+# held-back research modules — nutation + rotating-NS, kept local, not shipped
+/src/nutation/
+/src/rotating/
+/src/extras_local.jl
+/src/models/mars_bml.jl
+/ext/
+/test/extras_local.jl
+/examples/quickstart.ipynb
+/examples/validation/
+
+# node tooling (KaTeX render-checks for the Typora docs) — local only
+/node_modules/
+/package-lock.json
+
+# examples env: resolve fresh against whatever Julia you have
+/examples/Manifest.toml
