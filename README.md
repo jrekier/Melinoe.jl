@@ -9,6 +9,7 @@ from the same assembled elastic–gravitational operator.
 |---|---|---|
 | tidal Love numbers | `love_numbers` | Kelvin analytic; PREM published values |
 | bulk properties | — | every model matches observed mass and moment of inertia |
+| interior structure | `Models.Mercury` | `R_core` solved from M + C/MR² → 1994 km vs Hauck+ 2013 |
 | free spheroidal modes | `free_modes` | MINEOS on PREM (ℓ=2, n=0–7, < 2%) |
 | pressure Love numbers | `pressure_love` | Dumberry & Bloxham (2004) PREM, ℓ=2–8 |
 | Sasao compliances | `compliances` | PREM references; Le Maistre Mars S8 |
@@ -25,7 +26,7 @@ using Pkg; Pkg.add(url = "https://github.com/jrekier/Melinoe.jl")
 ```julia
 using Melinoe
 
-m  = Melinoe.Models.PREM()            # or .Mars(), .Ganymede(), .Kelvin()
+m  = Melinoe.Models.PREM()            # or .Mercury(), .Mars(), .Ganymede(), .Kelvin()
 ln = love_numbers(m)                  # (; h, l, k) at ℓ=2
 fm = free_modes(m)                    # spheroidal eigenmodes
 c  = compliances(m; core_layer = 2)   # Sasao κ, ξ, γ, β + Betti check

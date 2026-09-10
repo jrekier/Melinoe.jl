@@ -275,6 +275,91 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         @test abs(c.betti) < 1e-3                     # reciprocity
     end
 
+    @testset "Mercury (MESSENGER-constrained) vs what it was not fitted to" begin
+        m = Mercury()
+        @test m.R_SI ≈ 2439.36e3                      # Perry+ 2015 mean radius
+        @test m.ρ̄_SI ≈ 5429.3 atol = 0.5              # M/(4πR³/3), observed
+        @test is_fluid(m.layers[1])                   # liquid core, reaching the centre
+        @test m.layers[1].aw == false                 # constant ρ ⇒ AW is the wrong closure
+        @test (1 - rightendpoint(m.layers[2].domain))*m.R_SI/1e3 ≈ 26.0 atol = 1e-6  # Sori 2018
+
+        # R_core is an OUTPUT of the M + I solve, never fitted to the value below:
+        # Hauck et al. 2013 (JGR Planets 118, 1204) get 2020 ± 30 km from the same
+        # two observables through a thermodynamic Fe-S route instead.
+        R_core = rightendpoint(m.layers[1].domain) * m.R_SI / 1e3
+        @test R_core ≈ 1994.5 atol = 0.1              # locked in
+        @test abs(R_core - 2020) < 30                 # within 1σ of Hauck+ 2013
+        ρ_core = m.layers[1].ρ₀(0.0) * m.ρ̄_SI
+        @test ρ_core ≈ 7253 atol = 1                  # liquid Fe-S at core pressures
+
+        # k₂ is left free by the solve, so it is an independent test of the moduli.
+        # Published determinations disagree by more than their errors: 0.451 ± 0.014
+        # (Mazarico+ 2014), 0.464 ± 0.023 (Verma & Margot 2016), 0.569 ± 0.025
+        # (Genova+ 2019). Compared against the middle one.
+        @test love_numbers(m).k ≈ 0.48855 atol = 1e-4               # locked in
+        @test abs(love_numbers(m).k - 0.464) < 2 * 0.023            # within 2σ
+
+        # ρ_mantle trades against R_core at ≈ −21 km per +100 kg/m³. That keeps the
+        # solved core inside the Hauck+ 2013 interval up to ≈ 3270 kg/m³ and no further,
+        # so the agreement above is a real constraint on the mantle, not a free pass.
+        Rc(ρm) = rightendpoint(Mercury(ρ_mantle = ρm).layers[1].domain) * m.R_SI / 1e3
+        @test Rc(3150.0) ≈ 2014.0 atol = 0.5
+        @test Rc(3350.0) ≈ 1973.0 atol = 0.5
+        @test abs(Rc(3150.0) - 2020) < 30 && abs(Rc(3250.0) - 2020) < 30
+        @test abs(Rc(3350.0) - 2020) > 30
+
+        # Genova+ 2019 read C/MR² = 0.333 as evidence for a solid inner core, because
+        # a uniform liquid core then has to be denser than Fe-S can be. The model must
+        # reproduce that inference, not paper over it.
+        g = Mercury(Cnd = 0.333)
+        @test g.layers[1].ρ₀(0.0) * g.ρ̄_SI ≈ 8105 atol = 1   # too dense for liquid Fe-S
+
+        # with an inner core seated below it, every index shifts up by one
+        mi = Mercury(Cnd = 0.333, r_inner_km = 1000.0)
+        @test length(mi.layers) == 4
+        @test !is_fluid(mi.layers[1]) && is_fluid(mi.layers[2])
+        @test mi.layers[1].ρ₀(0.0) > mi.layers[2].ρ₀(0.0)     # solid denser than liquid
+        @test leftendpoint(mi.layers[2].domain)*mi.R_SI/1e3 ≈ 1000.0 rtol = 1e-9
+
+        # guards: an inner core cannot reach past the solved core radius, and a
+        # C/MR² light enough to invert the core/mantle density must be refused
+        @test_throws ArgumentError Mercury(r_inner_km = 2200.0)
+        @test_throws ArgumentError Mercury(Cnd = 0.45)      # core would pass the crust
+        @test_throws ArgumentError Mercury(Cnd = 0.20)      # no core denser than the mantle
+    end
+
+    @testset "Europa and Callisto: structure follows from M and C/MR²" begin
+        e = Europa()
+        @test length(e.layers) == 4
+        @test is_fluid(e.layers[3])                    # the ocean
+        @test !is_fluid(e.layers[4])                   # solid ice shell above it
+        @test e.layers[3].aw == false                  # constant ρ ⇒ AW is the wrong closure
+        # BOTH interior radii are OUTPUTS of the mass + moment solve; the densities are
+        # inputs from material physics, so the core stays in the metallic range by fiat
+        @test rightendpoint(e.layers[1].domain)*e.R_SI/1e3 ≈ 641.9 atol = 1.0
+        @test rightendpoint(e.layers[2].domain)*e.R_SI/1e3 ≈ 1460.5 atol = 1.0
+        # the ocean is what is left between the solved mantle top and the ice shell
+        @test (rightendpoint(e.layers[3].domain) -
+               rightendpoint(e.layers[2].domain))*e.R_SI/1e3 ≈ 80.3 atol = 0.5
+        ln = love_numbers(e)
+        @test ln.k ≈ 0.2498 atol = 1e-3                # ocean-bearing Europa, ~0.25
+        @test -ln.h ≈ 1.200 atol = 1e-2
+        # a mantle this dense needs no core at all, so M and C/MR² cannot both be met
+        @test_throws ArgumentError Europa(ρ_mantle = 3800.0)
+        @test_throws ArgumentError Europa(h_ice_km = 140.0)   # no room left for an ocean
+
+        c = Callisto()
+        @test length(c.layers) == 3
+        @test is_fluid(c.layers[2])
+        # the interior is a rock-ice MIXTURE: denser than ice, far lighter than rock
+        ρ_int = c.layers[1].ρ₀(0.5) * c.ρ̄_SI
+        @test 1800 < ρ_int < 2600
+        @test ρ_int ≈ 2281 atol = 5
+        @test rightendpoint(c.layers[1].domain)*c.R_SI/1e3 ≈ 2075.0 atol = 1.0
+        # too thick a shell leaves no room for an ocean
+        @test_throws ArgumentError Callisto(h_ice_km = 400.0)
+    end
+
     @testset "PREM pressure Love numbers vs Dumberry & Bloxham 2004 Table 2" begin
         # Unit pressure at the CMB (top of the outer core), elastic PREM. Their
         # published k_n, h_n for n = 2, 4, 6, 8 — four degrees over 2.5 decades,
@@ -328,6 +413,39 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         @test Ganymede().layers[2].μ(0.5) * Ganymede().p_unit ≈ 50.0e9 rtol = 1e-9
         @test Ganymede().layers[3].μ(0.8) * Ganymede().p_unit ≈  6.6e9 rtol = 1e-9
         @test Ganymede().layers[5].μ(0.99)* Ganymede().p_unit ≈  3.3e9 rtol = 1e-9
+
+        # h_ice_km is not free: M and C/MR² are pinned, so the shell thickness is paid
+        # for in core density, and past 219.1 km the core comes out lighter than the
+        # mantle. Refuse those rather than return a plausible-looking model.
+        ρc(h) = (m = Ganymede(h_ice_km = h);
+                 m.layers[1].ρ₀(rightendpoint(m.layers[1].domain)) * m.ρ̄_SI)
+        @test ρc(100.0) ≈ 5661.7 rtol = 1e-4        # regression lock
+        @test ρc(84.0)  > 5900                       # Fe–FeS window, upper edge
+        @test ρc(134.0) < 5010                       #   ""          lower edge
+        let g = Ganymede()                           # monotone at the default
+            @test issorted([l.ρ₀(rightendpoint(l.domain)) for l in g.layers]; rev = true)
+        end
+        @test_throws ArgumentError Ganymede(h_ice_km = 250.0)   # density inversion
+        @test_throws ArgumentError Ganymede(h_ice_km = 330.0)
+        @test Ganymede(h_ice_km = 215.0) isa PlanetModel        # just inside the bound
+
+        # standard parameterisation: densities from material physics, radii solved.
+        # No cap — R_core moves instead of ρ_core — and M, C/MR² still exact.
+        for h in (20.0, 100.0, 330.0)
+            g = Ganymede(h_ice_km = h, ρ_core = 5500.0, ρ_mantle = 3300.0)
+            xb = [rightendpoint(l.domain) for l in g.layers]; xa = [0.0; xb[1:end-1]]
+            ρ  = [l.ρ₀(rightendpoint(l.domain)) * g.ρ̄_SI for l in g.layers]
+            M  = (4π/3) * g.ρ̄_SI * g.R_SI^3
+            C  = (8π/15) * sum(ρ[i]*(xb[i]^5 - xa[i]^5) for i in 1:5) * g.R_SI^5
+            @test M ≈ 1.482e23 rtol = 1e-10
+            @test C/(M*g.R_SI^2) ≈ 0.3105 rtol = 1e-10
+            @test ρ[1] ≈ 5500.0 && ρ[2] ≈ 3300.0
+            @test 0 < xb[1] < xb[2] < xb[3]                 # radii stay ordered
+            @test issorted(ρ; rev = true)
+        end
+        @test rightendpoint(Ganymede(h_ice_km = 100.0, ρ_core = 5500.0,
+                                     ρ_mantle = 3300.0).layers[1].domain) *
+              2631.2e3 ≈ 747.7e3 rtol = 1e-3      # regression lock on R_core
     end
 
     @testset "Bulk properties: mass and moment of inertia vs observation" begin
@@ -360,6 +478,22 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         # → mean moment at the mean radius, 0.36401.
         @test mass(Mars()) ≈ 6.4171e23 rtol = 1e-6
         @test moi(Mars())  ≈ 0.36401   rtol = 1e-5
+
+        # Mercury — matched the other way round: densities are fixed by material
+        # physics and the core radius and density are solved from M and I, so both
+        # come out at the accuracy of the closed-form solve, not of a fit.
+        # Europa and Callisto — same two constraints, different unknowns. Europa: both
+        # interior radii, by Newton, with the densities fixed by material physics.
+        # Callisto: the rock-ice interior's density and radius in closed form, because
+        # it is not fully differentiated.
+        @test mass(Europa())   ≈ 4.7998e22 rtol = 1e-12
+        @test moi(Europa())    ≈ 0.3547    rtol = 1e-12
+        @test mass(Callisto()) ≈ 7179.292e9/6.674e-11 rtol = 1e-12
+        @test moi(Callisto())  ≈ 0.3549    rtol = 1e-12
+
+        @test mass(Mercury()) ≈ 3.3011e23 rtol = 1e-9
+        @test moi(Mercury())  ≈ 0.346 * (1 - 2*(5.0323e-5/0.346)/3) * (2440.0/2439.36)^2 rtol = 1e-7
+        @test mass(Mercury(r_inner_km = 800.0)) ≈ 3.3011e23 rtol = 1e-9
     end
 
 # ══ 6. Model construction and I/O ════════════════════════════════════════════

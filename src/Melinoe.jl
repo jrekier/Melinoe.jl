@@ -41,7 +41,10 @@ module Models
     include("models/ganymede.jl")
     include("models/prem.jl")
     include("models/mars.jl")
-    export PREM, Mars, Ganymede, Kelvin
+    include("models/mercury.jl")
+    include("models/europa.jl")
+    include("models/callisto.jl")
+    export PREM, Mars, Mercury, Ganymede, Europa, Callisto, Kelvin
 end
 
 export
