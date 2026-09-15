@@ -580,6 +580,77 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         @test isnan(love_numbers(m).l)                 # fluid (ocean) surface
     end
 
+    @testset "planet_from_table == load_planet_csv on the same samples" begin
+        # The file loader is a parser in front of planet_from_table; feeding the parsed
+        # columns back in must give the same model, fits and all. Checked both ways of
+        # delimiting layers: an explicit layer column, and repeated radii alone.
+        f = joinpath(@__DIR__, "..", "examples", "PREM_1s.csv")
+        m = load_planet_csv(f)
+        cols, _ = Melinoe._read_csv_table(f)
+        r = maximum(cols[:depth]) .- cols[:depth]      # PREM_1s carries depth and radius
+        K, μ = Melinoe._moduli_from(cols, cols[:ρ], f)
+        t = planet_from_table(cols[:r], cols[:ρ], K, μ; name = "PREM_1s")
+        @test length(t.layers) == length(m.layers)
+        @test [rightendpoint(l.domain) for l in t.layers] == [rightendpoint(l.domain) for l in m.layers]
+        @test [l.n for l in t.layers] == [l.n for l in m.layers]
+        @test findall(is_fluid, t.layers) == findall(is_fluid, m.layers)
+        @test t.ρ̄_SI == m.ρ̄_SI
+        @test love_numbers(t).k == love_numbers(m).k    # bit-identical: same fits
+        @test love_numbers(t).h == love_numbers(m).h
+        # with layer names, in a scrambled row order, from a two-layer table
+        rr  = [0.0, 0.5, 1.0, 1.0, 1.5, 2.0] .* 1e6
+        lay = ["core", "core", "core", "shell", "shell", "shell"]
+        ρ   = [8000.0, 8000, 8000, 3000, 3000, 3000]
+        KK  = [3e11, 3e11, 3e11, 1e11, 1e11, 1e11]
+        μμ  = [0.0, 0, 0, 5e10, 5e10, 5e10]
+        p   = [4, 1, 6, 2, 5, 3]
+        a = planet_from_table(rr, ρ, KK, μμ; layer = lay)
+        b = planet_from_table(rr[p], ρ[p], KK[p], μμ[p]; layer = lay[p])
+        @test length(a.layers) == 2 && is_fluid(a.layers[1]) && !is_fluid(a.layers[2])
+        @test love_numbers(a).k == love_numbers(b).k
+        # what it refuses
+        @test_throws ArgumentError planet_from_table(rr, ρ, KK, μμ[1:5])
+        @test_throws ArgumentError planet_from_table(rr, ρ, KK, μμ; layer = lay[1:3])
+    end
+
+    @testset "load_planet_profiles: per-layer blocks, units, tags, notes" begin
+        txt = """
+        # a two-layer body   Omega_SI=7.088e-5
+        ## layer 1 — core (fluid)   [0.0 – 1800.0 km]  aw=false
+        #    r[km]      rho        K       mu        g
+               0.0   6800.0    200.0      0.0    0.000
+             900.0   6800.0    200.0      0.0    1.000
+            1800.0   6800.0    200.0      0.0    2.000
+        ## layer 2 — mantle (solid)   [1800.0 – 3389.5 km]
+        #    r[km]      rho        K       mu
+            1800.0   3500.0    120.0     70.0
+            2594.75  3500.0    120.0     70.0
+            3389.5   3500.0    120.0     70.0
+
+        # ── notes after the blocks are ignored ──
+        core    r  = [0.0, 1800.0]
+                K  = [200.0, 200.0]
+        """
+        f = tempname() * ".txt"; write(f, txt)
+        m = load_planet_profiles(f)
+        @test length(m.layers) == 2 && is_fluid(m.layers[1]) && !is_fluid(m.layers[2])
+        @test m.R_SI ≈ 3389.5e3 && m.Ω_SI ≈ 7.088e-5
+        @test m.layers[1].κ(0.2) * m.p_unit ≈ 200e9 rtol = 1e-9      # GPa in, Pa in the model
+        # same numbers through planet_from_table
+        t = planet_from_table([0, 900e3, 1800e3, 1800e3, 2594.75e3, 3389.5e3], fill(6800.0, 3) ∪ fill(3500.0, 3) |> x -> [6800.0, 6800, 6800, 3500, 3500, 3500],
+                              [200e9, 200e9, 200e9, 120e9, 120e9, 120e9], [0.0, 0, 0, 70e9, 70e9, 70e9];
+                              layer = ["core", "core", "core", "mantle", "mantle", "mantle"], Ω_SI = 7.088e-5)
+        @test love_numbers(m).k == love_numbers(t).k
+        # an explicit unit on a column overrides the default
+        g = replace(txt, "r[km]" => "r[m]", "0.0   6800" => "0.0   6800")
+        g = replace(g, "900.0" => "900000.0", "1800.0" => "1800000.0", "2594.75" => "2594750.0", "3389.5" => "3389500.0")
+        write(f, g); @test load_planet_profiles(f).R_SI ≈ 3389.5e3
+        # a header tag that contradicts μ is an error
+        write(f, replace(txt, "core (fluid)" => "core (solid)"))
+        @test_throws ArgumentError load_planet_profiles(f)
+        rm(f)
+    end
+
     @testset "load_planet_csv: formats, units, and what it refuses" begin
         hdr = "layer,radius[unit=\"m\"],density[unit=\"kg/m^3\"],K[unit=\"Pa\"],mu[unit=\"Pa\"]"
         rows(lbl, r1, r2, ρ, K, μ) =

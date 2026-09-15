@@ -53,7 +53,7 @@ export
     # model
     Layer, is_fluid, is_incompressible,
     PlanetModel, build_model,
-    load_planet_csv, write_planet_csv, write_planet_coeffs, planet_coeffs,
+    load_planet_csv, load_planet_profiles, planet_from_table, write_planet_csv, write_planet_coeffs, planet_coeffs,
     layers_of, radial_profile, ω_unit, T_minutes, dahlenize, rotation_rate,
     # assembly / operators
     gravitoelastic_blocks, surface_bc_rows, assemble_planet, interior_ranges,

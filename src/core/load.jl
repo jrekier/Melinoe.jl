@@ -252,6 +252,38 @@ function load_planet_csv(path; name = splitext(basename(path))[1], poly_degree::
           haskey(cols, :depth) ? maximum(cols[:depth]) .- cols[:depth] :
           throw(ArgumentError("$path: no position column (radius | depth)"))
 
+    Ω = Ω_SI !== nothing ? Float64(Ω_SI) :
+        haskey(meta, "omega_si") ? something(tryparse(Float64, meta["omega_si"]), 0.0) : 0.0
+    planet_from_table(r_m, ρv, Kv, μv; layer = get(cols, :layer, nothing), name,
+                      poly_degree, μ_tol, Ω_SI = Ω, rtol)
+end
+
+"""
+    planet_from_table(r_m, ρ, K, μ; layer=nothing, name="table", poly_degree=5,
+                      μ_tol=1e7, Ω_SI=0.0, rtol=1e-3) -> PlanetModel
+
+Build a `PlanetModel` from sampled radial profiles already in memory: radius `r_m`
+[m], density `ρ` [kg/m³], bulk modulus `K` [Pa] and shear modulus `μ` [Pa], one
+entry per sample, in any radial order. This is what `load_planet_csv` does once it
+has parsed its file — the layer grouping, the least-squares fits and the fluid
+detection are the same code — so anything that holds the table already (another
+language, a notebook, a model generator) can skip the file.
+
+Layers come from `layer` (a `Vector` of names, one per sample) if given, else from
+repeated radii. See `load_planet_csv` for everything else.
+"""
+function planet_from_table(r_m::AbstractVector, ρv::AbstractVector, Kv::AbstractVector,
+                           μv::AbstractVector; layer = nothing, name::AbstractString = "table",
+                           poly_degree::Int = 5, μ_tol = 1e7, Ω_SI::Real = 0.0, rtol = 1e-3)
+    n = length(r_m)
+    (length(ρv) == length(Kv) == length(μv) == n) || throw(ArgumentError(
+        "$name: r, ρ, K, μ must have the same length, got " *
+        "$(n), $(length(ρv)), $(length(Kv)), $(length(μv))"))
+    (layer === nothing || length(layer) == n) || throw(ArgumentError(
+        "$name: layer has $(length(layer)) entries for $n samples"))
+    r_m = Float64.(r_m); ρv = Float64.(ρv); Kv = Float64.(Kv); μv = Float64.(μv)
+    layer === nothing || (layer = String.(layer))
+
     # order inward→outward, preserving the file's ordering of repeated radii
     if issorted(r_m, rev = true)
         perm = reverse(eachindex(r_m))
@@ -261,15 +293,15 @@ function load_planet_csv(path; name = splitext(basename(path))[1], poly_degree::
         perm = sortperm(r_m; alg = MergeSort)
     end
     r_m = r_m[perm];  ρv = ρv[perm];  Kv = Kv[perm];  μv = μv[perm]
-    lname = haskey(cols, :layer) ? cols[:layer][perm] : nothing
+    lname = layer === nothing ? nothing : layer[perm]
 
     R = maximum(r_m)
     R > 1e4 || throw(ArgumentError(
-        "$path: outermost radius is $(R) m. If the file is in km, annotate the column " *
+        "$name: outermost radius is $(R) m. If the file is in km, annotate the column " *
         "as radius[unit=\"km\"]."))
     r0 = minimum(r_m)
     r0 ≤ 1e-4 * R || throw(ArgumentError(
-        "$path: innermost sample is at r = $(round(r0/1e3, digits=1)) km, so the model " *
+        "$name: innermost sample is at r = $(round(r0/1e3, digits=1)) km, so the model " *
         "has a hole at the centre. The solver imposes regularity at r=0 and needs the " *
         "table to reach it."))
     x = r_m ./ R
@@ -282,7 +314,7 @@ function load_planet_csv(path; name = splitext(basename(path))[1], poly_degree::
         for i in firstindex(groups):lastindex(groups)-1    # contiguity is not guaranteed here
             top, bot = maximum(x[groups[i]]), minimum(x[groups[i+1]])
             isapprox(top, bot; atol = 1e-9) || throw(ArgumentError(
-                "$path: layers \"$(order[i])\" and \"$(order[i+1])\" are not contiguous — " *
+                "$name: layers \"$(order[i])\" and \"$(order[i+1])\" are not contiguous — " *
                 "$(round(top*R/1e3, digits=2)) km vs $(round(bot*R/1e3, digits=2)) km. " *
                 "Gaps and overlaps are not resolvable into a layered model."))
         end
@@ -296,7 +328,7 @@ function load_planet_csv(path; name = splitext(basename(path))[1], poly_degree::
         order  = ["layer$k" for k in eachindex(groups)]
     end
     filter!(g -> length(g) ≥ 2, groups)
-    isempty(groups) && throw(ArgumentError("$path: no layer has two or more samples"))
+    isempty(groups) && throw(ArgumentError("$name: no layer has two or more samples"))
 
     # ── fit each layer ───────────────────────────────────────────────────────
     cρ = Vector{Float64}[]; κc = Function[]; μc = Function[]
@@ -320,7 +352,7 @@ function load_planet_csv(path; name = splitext(basename(path))[1], poly_degree::
                 continue
             end
             any(isinf, ys) && throw(ArgumentError(
-                "$path: layer \"$(order[k])\" mixes finite and infinite $q; a layer is " *
+                "$name: layer \"$(order[k])\" mixes finite and infinite $q; a layer is " *
                 "either incompressible throughout or not at all"))
             c, e = _lsq_fit(ts, ys, poly_degree; rtol)
             e < rtol || push!(poor, "$(order[k]) $q (rel. RMS $(round(e, sigdigits=2)))")
@@ -331,8 +363,8 @@ function load_planet_csv(path; name = splitext(basename(path))[1], poly_degree::
         push!(fluid, isfl); push!(xb, last(xs))
         push!(ns, clamp(round(Int, 250*(last(xs) - first(xs))) + 20, 20, 160))
     end
-    isempty(poor) || @warn "load_planet_csv: some layers were not resolved to rtol=$rtol; \
-                            raise poly_degree or check the table" file=path layers=poor
+    isempty(poor) || @warn "planet_from_table: some layers were not resolved to rtol=$rtol; \
+                            raise poly_degree or check the table" model=name layers=poor
 
     nL = length(groups); doms = [xb[i]..xb[i+1] for i in 1:nL]
     ρ̄ = 3*sum(poly_r2_integral(cρ[i], xb[i], xb[i+1]) for i in 1:nL)
@@ -340,9 +372,91 @@ function load_planet_csv(path; name = splitext(basename(path))[1], poly_degree::
     κf = Function[let f = κc[i]; y -> (v = f(y); isinf(v) ? Inf : v/p_u) end for i in 1:nL]
     μf = Function[let f = μc[i]; y -> f(y)/p_u end for i in 1:nL]
     aw = [!fluid[i] for i in 1:nL]                 # fluid → non-AW (solid: ignored)
-    Ω = Ω_SI !== nothing ? Float64(Ω_SI) :
-        haskey(meta, "omega_si") ? something(tryparse(Float64, meta["omega_si"]), 0.0) : 0.0
-    build_model(name, doms, dens, κf, μf, ns; R_SI = R, ρ̄_SI = ρ̄, aw = aw, Ω_SI = Ω)
+    build_model(name, doms, dens, κf, μf, ns; R_SI = R, ρ̄_SI = ρ̄, aw = aw, Ω_SI = Float64(Ω_SI))
+end
+
+"""
+    load_planet_profiles(path; name, Ω_SI=nothing, poly_degree=5, μ_tol=1e7, rtol=1e-3) -> PlanetModel
+
+Read a model written as per-layer profile blocks:
+
+    ## layer 1 — core (fluid)   [0.0 – 1620.0 km]  aw=false
+    #    r[km]        rho        K       mu        g       Vp       Vs
+           0.0     6840.0    250.0      0.0    0.000    6.046    0.000
+         202.5     6831.1    247.9      0.0    0.387    6.024    0.000
+    ...
+    ## layer 2 — bml (fluid)   [1620.0 – 1800.0 km]  aw=false
+    ...
+
+Each `## layer` line opens a block and names it (the text between `—` and the first
+`(` or `[`); the `#` line before the data names the columns, of which `r`, `rho`/`ρ`,
+`K` and `mu`/`μ` are used and the rest ignored. Units are km, kg/m³, GPa, GPa unless a
+column carries a `[unit]` (`r[m]`, `K[Pa]`, …). A `(fluid)`/`(solid)` tag on the header
+is checked against `μ`, a mismatch being an error; without a tag the fluid test is
+`|μ| < μ_tol`. Lines whose first field is not a number are skipped, so free-form notes
+after the blocks do no harm. `Ω_SI` defaults to an `Omega_SI=…` found in any `#` line,
+else 0. Everything from the samples on is [`planet_from_table`](@ref).
+"""
+function load_planet_profiles(path; name = splitext(basename(path))[1], Ω_SI = nothing,
+                              poly_degree::Int = 5, μ_tol = 1e7, rtol = 1e-3)
+    layer = String[]; rv = Float64[]; ρv = Float64[]; Kv = Float64[]; μv = Float64[]
+    tags  = Dict{String,Union{Nothing,Bool}}()          # name → fluid tag from the header
+    cur   = nothing;  cols = nothing;  scale = nothing
+    ω_meta = nothing
+    for (ln, raw) in enumerate(eachline(path))
+        l = strip(raw); isempty(l) && continue
+        if startswith(l, "##")
+            h = strip(l[3:end])
+            m = match(r"^layer\s*\d*\s*[—–-]+\s*([^(\[]+?)\s*(?:\(\s*(fluid|solid)\s*\))?\s*(?:\[|$)", h)
+            m === nothing && throw(ArgumentError("$path line $ln: cannot read a layer header from \"$l\""))
+            cur = String(strip(m[1]))
+            tags[cur] = m[2] === nothing ? nothing : (m[2] == "fluid")
+            cols = nothing
+            continue
+        end
+        if startswith(l, '#')
+            for m in eachmatch(r"omega_si\s*=\s*([^\s,]+)"i, l)
+                ω_meta = tryparse(Float64, m[1])
+            end
+            # a column line: names, optionally name[unit]
+            toks = split(strip(l[2:end]))
+            if !isempty(toks) && any(t -> lowercase(_strip_unit(t)) in ("r", "radius"), toks)
+                names = [lowercase(_strip_unit(t)) for t in toks]
+                units = [_unit_of(occursin('[', t) ? "[unit=\"" * match(r"\[(.*?)\]", t)[1] * "\"]" : "") for t in toks]
+                want  = Dict("r" => :r, "radius" => :r, "rho" => :ρ, "ρ" => :ρ, "density" => :ρ,
+                             "k" => :K, "kappa" => :K, "κ" => :K, "mu" => :μ, "μ" => :μ)
+                idx = Dict{Symbol,Int}(); sc = Dict{Symbol,Float64}()
+                for (j, nm) in enumerate(names)
+                    haskey(want, nm) || continue
+                    sym = want[nm]; idx[sym] = j
+                    dflt = sym === :r ? "km" : sym === :ρ ? "kg/m^3" : "gpa"
+                    kind = sym === :r ? :length : sym === :ρ ? :density : :modulus
+                    sc[sym] = _unit_scale(kind, isempty(units[j]) ? dflt : units[j], toks[j])
+                end
+                all(k -> haskey(idx, k), (:r, :ρ, :K, :μ)) || throw(ArgumentError(
+                    "$path line $ln: column line must name r, rho, K and mu; got $(join(names, ' '))"))
+                cols = idx; scale = sc
+            end
+            continue
+        end
+        f = split(l)
+        (tryparse(Float64, _numstr(f[1])) === nothing) && continue      # notes, not data
+        cur === nothing && throw(ArgumentError("$path line $ln: data before any '## layer' header"))
+        cols === nothing && throw(ArgumentError("$path line $ln: no '# r rho K mu …' column line for layer \"$cur\""))
+        length(f) ≥ maximum(values(cols)) || throw(ArgumentError("$path line $ln: too few fields"))
+        v(sym) = (x = tryparse(Float64, _numstr(f[cols[sym]])); x === nothing &&
+                  throw(ArgumentError("$path line $ln: cannot parse $(f[cols[sym]])")); x * scale[sym])
+        push!(layer, cur); push!(rv, v(:r)); push!(ρv, v(:ρ)); push!(Kv, v(:K)); push!(μv, v(:μ))
+    end
+    isempty(rv) && throw(ArgumentError("$path: no profile data found"))
+    for (nm, tag) in tags                                   # header tag vs the numbers
+        tag === nothing && continue
+        isfl = maximum(abs, μv[layer .== nm]) < μ_tol
+        isfl == tag || throw(ArgumentError(
+            "$path: layer \"$nm\" is tagged $(tag ? "fluid" : "solid") but its μ says otherwise"))
+    end
+    Ω = Ω_SI !== nothing ? Float64(Ω_SI) : something(ω_meta, 0.0)
+    planet_from_table(rv, ρv, Kv, μv; layer, name, poly_degree, μ_tol, Ω_SI = Ω, rtol)
 end
 
 """

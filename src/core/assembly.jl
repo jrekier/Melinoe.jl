@@ -50,15 +50,18 @@ function assemble_planet(layers::Vector{Layer}, ℓ::Int)
     flu = [is_fluid(l) for l in layers]
     N   = 3 * sum(ns)
 
-    Amat = zeros(N, N)
-    Bmat = zeros(N, N)
+    # Blocks first: they carry the element type, which is complex when any modulus is
+    # (a viscoelastic μ(ω)) and Float64 otherwise.
+    ops  = [gravitoelastic_blocks(layers[i], ℓ, i == 1) for i in 1:L]
+    T    = promote_type(Float64, (eltype(o.A_UU) for o in ops)...)
+
+    Amat = zeros(T, N, N)
+    Bmat = zeros(T, N, N)
     bc_rows = Int[]   # rows holding BC/junction equations — rescaled at the end
     # Junction rows that carry an applied-potential RHS (Dahlen-reduced fluids
     # only): potential_forcing adds coef·amplitude·potential(r0) to row when the
     # named layer is forced. Empty for standard formulations.
-    jrhs = @NamedTuple{row::Int, layer::Int, coef::Float64, r0::Float64}[]
-
-    ops  = [gravitoelastic_blocks(layers[i], ℓ, i == 1) for i in 1:L]
+    jrhs = @NamedTuple{row::Int, layer::Int, coef::T, r0::Float64}[]
     Svec = [ops[i].S for i in 1:L]
     Dvec = [ops[i].D for i in 1:L]
 

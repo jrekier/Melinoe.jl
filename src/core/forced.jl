@@ -49,8 +49,8 @@ _spec(f::Potential, m)   = (f.Φ,                              f.amplitude, _mas
 A solved forced state, holding the spectral field `x = [U; V/P; δφ]`. Read it
 with `radial` / `tangential` / `potential` / `moment`.
 """
-struct Forced
-    x     :: Vector{Float64}
+struct Forced{T}
+    x     :: Vector{T}
     model :: PlanetModel
     ops
     ns    :: Vector{Int}

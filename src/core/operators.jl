@@ -35,6 +35,12 @@ under the Dahlen closure. Also returns `fluid`, the space `S`, the derivative `D
 function gravitoelastic_blocks(layer::Layer, ℓ::Int, is_inner::Bool)
     dom = layer.domain
     n   = layer.n
+    # The element type follows the moduli. A viscoelastic μ(ω) is complex, which makes
+    # every block complex; the solve, the BCs and read_love are all generic already, so
+    # this is the only place the choice has to be made. Real moduli reduce to Float64
+    # exactly. κ = Inf (incompressible) is a Float64 and promotes harmlessly.
+    _rmid = (leftendpoint(dom) + rightendpoint(dom)) / 2
+    T = promote_type(Float64, typeof(layer.μ(_rmid)), typeof(layer.κ(_rmid)))
     S = is_inner ? Jacobi(0, ℓ, dom) : Chebyshev(dom)
     r = Fun(identity, S)
     D = Derivative(S)
@@ -73,13 +79,13 @@ function gravitoelastic_blocks(layer::Layer, ℓ::Int, is_inner::Bool)
             Mwm  = Matrix(Mw[1:n, 1:n])
             Mr2m = Matrix(cuR(Multiplication(r^2, S))[1:n, 1:n])
             n_rid = is_inner ? n-1 : n-2
-            A_UU = zeros(n, n); A_UV = zeros(n, n); A_Uφ = zeros(n, n)
+            A_UU = zeros(T, n, n); A_UV = zeros(T, n, n); A_Uφ = zeros(T, n, n)
             A_UU[1:n_rid, :] = Mwm[1:n_rid, :]
             A_Uφ[1:n_rid, :] = Mr2m[1:n_rid, :]
             A_UU[n_rid+1, :] = A_VU[n, :]
             A_UV[n_rid+1, :] = A_VV[n, :]
             A_Uφ[n_rid+1, :] = A_Vφ[n, :]
-            B_UU = zeros(n, n)
+            B_UU = zeros(T, n, n)
 
             # src = −3r²ρ₀′/g₀, one full coefficient sample per closure.
             # aw: ρ₀′ = −ρ₀²g/κ ⇒ src = 3r²ρ₀²/κ (κ = Inf ⇒ src ≡ 0).
@@ -90,14 +96,14 @@ function gravitoelastic_blocks(layer::Layer, ℓ::Int, is_inner::Bool)
             RS_δφ = rangespace(A33)
             cuδ   = op -> Conversion(rangespace(op), RS_δφ) * op
             srcm  = Matrix(cuδ(Multiplication(src, S))[1:n, 1:n])
-            A_φU  = zeros(n, n)
-            A_φV  = zeros(n, n)
+            A_φU  = zeros(T, n, n)
+            A_φV  = zeros(T, n, n)
             A_φφ  = Matrix(A33[1:n, 1:n]) + srcm
 
             return (A_UU=A_UU, A_UV=A_UV, A_Uφ=A_Uφ,
                     A_VU=A_VU, A_VV=A_VV, A_Vφ=A_Vφ,
                     A_φU=A_φU, A_φV=A_φV, A_φφ=A_φφ,
-                    B_UU=B_UU, B_VU=zeros(n, n), B_VV=zeros(n, n),
+                    B_UU=B_UU, B_VU=zeros(T, n, n), B_VV=zeros(T, n, n),
                     A_φΦ=srcm, fluid=true, S=S, D=D)
         end
 
@@ -122,14 +128,14 @@ function gravitoelastic_blocks(layer::Layer, ℓ::Int, is_inner::Bool)
         if is_incompressible(layer)
             # κ → ∞: drop all 1/κ terms; Poisson reverts to ∇²δφ = −3ρ₀'U
             A_UV = Matrix((r^3 * D)[1:n, 1:n])
-            B_VV = zeros(n, n)
+            B_VV = zeros(T, n, n)
 
             A33   = r^2 * D^2 + 2r * D - ℓ*(1+ℓ)
             RS_δφ = rangespace(A33)
             cuδ   = op -> Conversion(rangespace(op), RS_δφ) * op
 
             A_φU = Matrix(cuδ(Multiplication(-3*r^2*Dρ₀, S))[1:n, 1:n])
-            A_φV = zeros(n, n)
+            A_φV = zeros(T, n, n)
             A_φφ = Matrix(A33[1:n, 1:n])
         else
             # Compressible. κ may diverge as 1/r² (PREM outer core AW closure
@@ -172,7 +178,7 @@ function gravitoelastic_blocks(layer::Layer, ℓ::Int, is_inner::Bool)
                 A_VU=A_VU, A_VV=A_VV, A_Vφ=A_Vφ,
                 A_φU=A_φU, A_φV=A_φV, A_φφ=A_φφ,
                 B_UU=B_UU, B_VU=B_VU, B_VV=B_VV,
-                A_φΦ=zeros(n, n), fluid=true, S=S, D=D)
+                A_φΦ=zeros(T, n, n), fluid=true, S=S, D=D)
     else
         # ── Solid operators: (U, V, δφ) ──────────────────────────────────────
         κ  = Fun(layer.κ, S)
@@ -217,8 +223,8 @@ function gravitoelastic_blocks(layer::Layer, ℓ::Int, is_inner::Bool)
         return (A_UU=A_UU, A_UV=A_UV, A_Uφ=A_Uφ,
                 A_VU=A_VU, A_VV=A_VV, A_Vφ=A_Vφ,
                 A_φU=A_φU, A_φV=A_φV, A_φφ=A_φφ,
-                B_UU=B_UU, B_VU=zeros(n, n), B_VV=B_VV,
-                A_φΦ=zeros(n, n), fluid=false, S=S, D=D)
+                B_UU=B_UU, B_VU=zeros(T, n, n), B_VV=B_VV,
+                A_φΦ=zeros(T, n, n), fluid=false, S=S, D=D)
     end
 end
 
