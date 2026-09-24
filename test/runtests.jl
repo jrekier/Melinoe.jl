@@ -1,7 +1,7 @@
 using Melinoe
 using Melinoe.Models          # PREM, Mars, Ganymede, Kelvin (qualified submodule)
 using ApproxFun: Fun, Chebyshev
-using LinearAlgebra: eigen, norm, Diagonal
+using LinearAlgebra: eigen, eigvals, norm, Diagonal
 using Test
 
 # Regression suite, in order of authority: analytic, then self-consistency checks
@@ -760,6 +760,152 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         @test occursin("fluid", txt)                  # the outer core is labelled
         @test occursin("(fitted", txt)                # the rational AW κ is flagged
         rm(tmp)
+    end
+
+    @testset "Clairaut flattening (PREM hydrostatic figure)" begin
+        fl = flattening(PREM(use_aw_oc = true, anelastic = true); Ω_SI = 7.2921e-5)
+        @test 1/fl.εa ≈ 300.0 atol = 3      # Earth hydrostatic ≈ 1/299.8
+        @test fl.ηa ≈ 0.59 atol = 0.02      # surface Radau parameter
+        @test 1/fl.ε(0.546) ≈ 393 atol = 5  # CMB flattening (Mathews PREM value)
+    end
+
+    @testset "SIC compliances (PREM solid inner core) — reciprocities" begin
+        c = sic_compliances(PREM(use_aw_oc=true, anelastic=true); ic_layer = 1, oc_layer = 2, Ω_SI = 7.2921e-5)
+        # the 2-layer subset must match compliances() (validated vs MHB)
+        @test c.κ ≈ 1.0506e-3 atol = 5e-6
+        @test c.ξ ≈ 2.2461e-4 atol = 5e-6
+        @test c.γ ≈ 1.9844e-3 atol = 5e-5
+        @test c.β ≈ 6.2325e-4 atol = 5e-6
+        # three Betti ties at machine precision (self-consistency of the SIC set)
+        @test abs(c.recip.ξγ) < 1e-7        # Â_tot·ξ = Â_f·γ
+        @test abs(c.recip.ζθ) < 1e-5        # Â_tot·ζ = Â_s·θ  (whole↔IC)
+        @test abs(c.recip.δχ) < 1e-6        # Â_f·δ  = Â_s·χ   (fluid↔IC)
+        # inner core is a tiny fraction of the moment ⇒ ζ, δ are tiny
+        @test c.Âs/c.Ât ≈ 7.3e-4 atol = 5e-5
+        @test abs(c.ζ) < 1e-7 && abs(c.δ) < 1e-5
+    end
+
+    @testset "SIC compliances vs Dumberry (2009) Table 1 — static & diurnal" begin
+        # His table uses PURELY ELASTIC PREM (no μ dispersion). `anelastic=true` would apply PREM's
+        # μ dispersion (f_IC = 0.920, Q_μ = 84.6), making every IC compliance ~9% high.
+        m = PREM(use_aw_oc=true, anelastic=false); Ω = 7.2921e-5
+        cs = sic_compliances(m; Ω_SI = Ω)                  # static  (ω² = 0)
+        cd = sic_compliances(m; Ω_SI = Ω, diurnal = true)  # diurnal (ω² = Ω̂²)
+        # ζ is the smallest entry in the table by five orders of magnitude (~5e-9),
+        # so it is the one most exposed to how finely the crust is layered: the
+        # 12-layer PREM puts the diurnal ζ 0.57% from Dumberry's value where the
+        # 10-layer one sat inside 0.5%. Everything else holds at 5e-3.
+        tol(k) = k === :ζ ? 1e-2 : 5e-3
+        for (k, s, d) in ((:κ,1.038e-3,1.039e-3), (:ξ,2.219e-4,2.222e-4), (:γ,1.962e-3,1.965e-3),
+                          (:β,6.151e-4,6.160e-4), (:ζ,5.134e-9,4.964e-9), (:δ,-4.865e-7,-4.869e-7),
+                          (:θ,7.024e-6,6.794e-6), (:χ,-7.529e-5,-7.536e-5), (:ν,7.984e-5,7.984e-5))
+            @test getfield(cs, k) ≈ s rtol = tol(k)
+            @test getfield(cd, k) ≈ d rtol = tol(k)
+        end
+        # inertia's signature is non-uniform: ζ,θ drop ~3.3%, the big four rise ~0.15%, ν is flat
+        @test (cd.ζ - cs.ζ)/cs.ζ ≈ -0.033 atol = 4e-3
+        @test (cd.θ - cs.θ)/cs.θ ≈ -0.033 atol = 4e-3
+        @test (cd.κ - cs.κ)/cs.κ ≈ +0.0010 atol = 1e-3
+        @test abs((cd.ν - cs.ν)/cs.ν) < 1e-3
+        @test abs(cd.recip.ξγ) < 1e-8      # Betti survives ω² ≠ 0
+    end
+
+    @testset "SIC nutation (PREM: α's vs MHB, FICN vs observed)" begin
+        α = sic_alphas(PREM(use_aw_oc=true, anelastic=true); Ω_SI = 7.2921e-5)
+        @test α.α1  ≈ 0.946 atol = 3e-3     # Dehant & Mathews eq. 7.152, PREM
+        @test α.α2  ≈ 0.829 atol = 3e-3
+        @test α.α3  ≈ 0.054 atol = 3e-3
+        @test α.α_g ≈ 2.175 atol = 5e-3
+        r = sic_nutation_modes(PREM(use_aw_oc=true, anelastic=true); Ω_SI = 7.2921e-5)
+        @test r.FICN ≈ 475 atol = 5         # observed +475 d — first-principles, no fitting
+        @test -466 < r.FCN < -455           # hydrostatic PREM FCN (obs -430 needs non-hydro CMB)
+        @test r.ICW > 1500                  # inner-core wobble, long prograde period
+    end
+
+    @testset "SIC nutation transfer (FICN residue suppression; S34 shift)" begin
+        # Probe each pole at the period this model puts it at, not at a literal.
+        m = PREM(use_aw_oc=true, anelastic=true); Ω = 7.2921e-5; Tsid = 2π/Ω/86400
+        ν2ω(P) = Tsid/P - 1.0                      # celestial period [d] → terrestrial ω
+        r = sic_nutation_modes(m; Ω_SI = Ω)
+        # residue ≈ T(ω_pole+δ)·δ, converged as δ→0
+        res(P, δ) = abs(sic_nutation_transfer(m, ν2ω(P) + δ; Ω_SI = Ω) * δ)
+        rFCN, rFICN = res(r.FCN, 1e-8), res(r.FICN, 1e-8)
+        @test rFCN  ≈ 1.0864e-4 rtol = 5e-3        # converged: δ=1e-8 vs 1e-9 agree to 1e-4
+        @test rFICN ≈ 5.024e-7  rtol = 5e-3
+        # The FICN is suppressed relative to the FCN by 4.5e-3 — ~6× the inertia
+        # ratio A_s/A ≈ 7.3e-4, not by A_s/A itself.
+        @test 3e-3 < rFICN/rFCN < 7e-3
+        # S34 moves the FICN pole 476 d → 546 d: the dip in |T| tracks with it
+        T(P; S34=0.0) = abs(sic_nutation_transfer(m, ν2ω(P); Ω_SI=Ω, S34))
+        @test T(475.76)             < T(475.76; S34=-2.70e-4)   # pole leaves 476 d
+        @test T(546.10; S34=-2.70e-4) < T(546.10)              # …and arrives at 546 d
+        # far from any pole T→~1 (rigid response)
+        @test T(-6798.4) ≈ 1 atol = 0.02
+    end
+
+    @testset "BMO nutation: a fluid core under a fluid layer" begin
+        # fluid core | fluid BML (lighter: Σ_bc is a density jump) | solid mantle
+        R, ρ̄ = 3389.5e3, 3935.0
+        xb   = [0.0, 1652.2e3/R, 1781.7e3/R, 1.0]
+        ρ    = [[6700.0, 0.0, -900.0], [4900.0, -200.0], [3600.0, -400.0]]
+        p_u  = (4π*Melinoe.G_SI/3) * ρ̄^2 * R^2
+        κ    = [_ -> 2.0e11/p_u, _ -> 1.5e11/p_u, _ -> 1.2e11/p_u]
+        μ    = [_ -> 0.0, _ -> 0.0, _ -> 7.0e10/p_u]
+        ρ̄fit = 3*sum(poly_r2_integral(ρ[i], xb[i], xb[i+1]) for i in 1:3)
+        m = build_model("bml-test", [xb[i]..xb[i+1] for i in 1:3], [c ./ ρ̄fit for c in ρ],
+                        κ, μ, [120, 40, 120]; R_SI = R, ρ̄_SI = ρ̄fit,
+                        aw = [false, false, true], Ω_SI = 7.088e-5)
+        @test is_fluid(m.layers[1]) && is_fluid(m.layers[2]) && !is_fluid(m.layers[3])
+        m = dahlenize(m)                     # stratified fluid at a solid wall
+        kw = (core_layer = 1, bmo_layer = 2)
+
+        # Betti reciprocity: Â_tot·ξc = Â_c·γc, Â_tot·ξb = Â_b·γb, Â_c·δc = Â_b·δb
+        c = bmo_compliances(m; kw...)
+        # the core-alone channel equals (core+BML) − BML, by linearity of the BVP
+        Ω̂² = (7.088e-5 / m.ω_unit)^2
+        cf(ls) = Potential(r -> r^2; amplitude = Ω̂²/3, layers = ls)
+        both, bml = forced(m, cf([1, 2]); ℓ = 2), forced(m, cf(2); ℓ = 2)
+        A_c = (8π/3)*c.Â_c
+        @test (moment(both, 1) - moment(bml, 1))/A_c ≈ c.βc rtol = 1e-8
+        @test abs(c.Â_tot*c.ξc - c.Â_c*c.γc) / abs(c.Â_c*c.γc) < 1e-6
+        @test abs(c.Â_tot*c.ξb - c.Â_b*c.γb) / abs(c.Â_b*c.γb) < 1e-6
+        @test abs(c.Â_c*c.δc   - c.Â_b*c.δb) / abs(c.Â_b*c.δb) < 1e-6
+
+        # FCN (retrograde, near-diurnal), BML figure mode (prograde, near-diurnal),
+        # Chandler (slow wobble)
+        nm = nutation_modes(m; kw...)
+        # M0's figure block is diagonal; D = diag(1, Â_c, Â_b) symmetrises M1's
+        # fluid block, off-diagonal −√(δc·δb)
+        @test nm.M0[2,3] == 0 && nm.M0[3,2] == 0
+        @test nm.M0[2,2] ≈ 1 + nm.ec && nm.M0[3,3] ≈ 1 + nm.eb
+        D = Diagonal([1.0, sqrt(c.Â_c), sqrt(c.Â_b)])
+        S = D * nm.M1 * inv(D)
+        @test S[2,3] ≈ S[3,2] rtol = 1e-8
+        @test S[2,3] ≈ -sqrt(c.δc*c.δb) rtol = 1e-8
+
+        ω  = sort(real.(nm.ω))
+        @test length(ω) == 3
+        @test ω[1] < -1 && ω[2] > -1 && abs(ω[2] + 1) < 0.1   # the two diurnal roots
+        @test abs(ω[3]) < 0.1                                 # Chandler
+        @test 0 < nm.ec < nm.e && 0 < nm.eb < nm.e            # cavity figures under the body's
+        @test nm.AcA > nm.AbA > 0
+
+        # the pole expansion reproduces T(ω) away from the poles
+        rs = nutation_residues(m; kw...)
+        for w in (-1.03, -0.97, 0.5)
+            pole = rs.q[1] + rs.q[2]*w + sum(rs.N ./ (w .- rs.ω))
+            @test pole ≈ nutation_transfer(m, w; kw...) rtol = 1e-8
+        end
+
+        # m̃_c = m̃_b is the Sasao two-layer body: ν = −(A/A_m)(e_f − β_f), moment-weighted
+        αc = c.Â_c/(c.Â_c + c.Â_b); αb = c.Â_b/(c.Â_c + c.Â_b)
+        Q(M) = [ M[1,1]                   M[1,2] + M[1,3]                             ;
+                 αc*M[2,1] + αb*M[3,1]    αc*(M[2,2] + M[2,3]) + αb*(M[3,2] + M[3,3]) ]
+        νl = 1 .+ sort(real.(eigvals(Q(nm.M0), -Q(nm.M1))))
+        ef = αc*nm.ec + αb*nm.eb
+        βf = αc*(c.βc + c.δc) + αb*(c.δb + c.βb)
+        @test νl[1] ≈ -(ef - βf)/(1 - nm.AcA - nm.AbA) rtol = 1e-3
+        @test νl[1] < 0                                       # still retrograde
     end
 
     # optional held-back tests (nutation + rotating) — present only locally

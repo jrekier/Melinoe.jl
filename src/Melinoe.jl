@@ -10,6 +10,11 @@ Build one `PlanetModel` — from the `Models` submodule (`Melinoe.Models.PREM()`
 or `compliances`. `forced(model, forcing)` leaves the solved fields open, read with
 `radial` / `tangential` / `potential` / `moment`.
 
+Rotation and nutation: `flattening` (Clairaut) for the hydrostatic figure, then
+either `sic_compliances` / `sic_nutation_modes` for a solid inner core, or
+`bmo_compliances` / `nutation_modes` / `nutation_residues` / `nutation_transfer`
+for a fluid core under a basal magma layer.
+
 The `examples/` notebooks are the guided tour.
 """
 module Melinoe
@@ -32,6 +37,12 @@ include("core/pressure.jl")
 include("core/compliance.jl")
 include("core/forced.jl")                 # composable Forcing → forced → readers
 include("core/load.jl")
+# ── rotation: hydrostatic figure, compliances, nutation ───────────────────────
+include("nutation/flattening.jl")
+include("nutation/compliance_sic.jl")     # solid inner core (Mathews–Herring–Buffett)
+include("nutation/nutation_sic.jl")
+include("nutation/compliance_bmo.jl")     # fluid core under a basal magma layer
+include("nutation/nutation_bmo.jl")
 # ── planet models — qualified only, e.g. `Melinoe.Models.PREM()` ──────────────
 module Models
     using ApproxFun
@@ -63,6 +74,13 @@ export
     Forcing, Tide, Centrifugal, Tilt, Potential, forced, Forced,
     radial, tangential, potential, surface_potential, moment,
     love_numbers, free_modes, pressure_love, compliances,
+    # rotation: hydrostatic figure
+    flattening,
+    # nutation with a solid inner core (MHB 4×4)
+    sic_compliances, sic_alphas, sic_nutation_modes, sic_nutation_transfer,
+    # nutation with a basal magma layer (3×3)
+    bmo_compliances, nutation_modes, nutation_transfer, nutation_residues,
+    ekman_K_bc, ekman_K_bm,
     # polynomial utilities
     poly_r2_integral, poly_r4_integral, self_gravity
 

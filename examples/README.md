@@ -24,6 +24,7 @@ On Julia 1.10 the `[sources]` entry is ignored, so add the checkout by hand inst
 | 3 | [`3_three_layer_forcing_tutorial.ipynb`](3_three_layer_forcing_tutorial.ipynb) | A three-layer Earth: `potential_forcing`, layer masks, and the `3×3` **compliance matrix** (κ, ξ, γ, …). |
 | 4 | [`4_prem_tutorial.ipynb`](4_prem_tutorial.ipynb) | The real **PREM**: Love numbers and Sasao/Mathews compliances vs reference values. |
 | 5 | [`5_free_modes_tutorial.ipynb`](5_free_modes_tutorial.ipynb) | Free oscillations: the same matrices as `A x = ω² B x` → the spheroidal normal modes vs MINEOS. |
+| 6 | [`6_nutation_tutorial.ipynb`](6_nutation_tutorial.ipynb) | Rotation: Clairaut's **figure**, the solid-inner-core compliances, and the four free modes — FCN, FICN, Chandler, ICW — against VLBI. |
 
 **Companion:** [`betti_reciprocity.ipynb`](betti_reciprocity.ipynb) — the field-by-field proof
 that the compliance matrix is reciprocal, `Âᵢ Sᵢⱼ = Âⱼ Sⱼᵢ` (referenced from notebooks 3 and 5).

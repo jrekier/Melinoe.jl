@@ -262,15 +262,15 @@ end
     planet_from_table(r_m, ρ, K, μ; layer=nothing, name="table", poly_degree=5,
                       μ_tol=1e7, Ω_SI=0.0, rtol=1e-3) -> PlanetModel
 
-Build a `PlanetModel` from sampled radial profiles already in memory: radius `r_m`
-[m], density `ρ` [kg/m³], bulk modulus `K` [Pa] and shear modulus `μ` [Pa], one
-entry per sample, in any radial order. This is what `load_planet_csv` does once it
-has parsed its file — the layer grouping, the least-squares fits and the fluid
-detection are the same code — so anything that holds the table already (another
-language, a notebook, a model generator) can skip the file.
+Build a `PlanetModel` from sampled radial profiles held in memory: radius `r_m` [m],
+density `ρ` [kg/m³], bulk modulus `K` [Pa], shear modulus `μ` [Pa], one entry per
+sample, in any radial order.
 
 Layers come from `layer` (a `Vector` of names, one per sample) if given, else from
-repeated radii. See `load_planet_csv` for everything else.
+repeated radii. Per-layer profiles are least-squares polynomials of degree ≤
+`poly_degree`; a layer whose `|μ|` never exceeds `μ_tol` is inviscid fluid and takes
+the non-AW closure. `load_planet_csv` and `load_planet_profiles` are this function
+behind a parser.
 """
 function planet_from_table(r_m::AbstractVector, ρv::AbstractVector, Kv::AbstractVector,
                            μv::AbstractVector; layer = nothing, name::AbstractString = "table",
@@ -392,10 +392,10 @@ Each `## layer` line opens a block and names it (the text between `—` and the 
 `(` or `[`); the `#` line before the data names the columns, of which `r`, `rho`/`ρ`,
 `K` and `mu`/`μ` are used and the rest ignored. Units are km, kg/m³, GPa, GPa unless a
 column carries a `[unit]` (`r[m]`, `K[Pa]`, …). A `(fluid)`/`(solid)` tag on the header
-is checked against `μ`, a mismatch being an error; without a tag the fluid test is
-`|μ| < μ_tol`. Lines whose first field is not a number are skipped, so free-form notes
-after the blocks do no harm. `Ω_SI` defaults to an `Omega_SI=…` found in any `#` line,
-else 0. Everything from the samples on is [`planet_from_table`](@ref).
+is checked against `μ`; without a tag the fluid test is `|μ| < μ_tol`. Lines whose
+first field is not a number are skipped, so notes after the blocks are ignored.
+`Ω_SI` defaults to an `Omega_SI=…` found in any `#` line, else 0. From the samples on
+this is [`planet_from_table`](@ref).
 """
 function load_planet_profiles(path; name = splitext(basename(path))[1], Ω_SI = nothing,
                               poly_degree::Int = 5, μ_tol = 1e7, rtol = 1e-3)
