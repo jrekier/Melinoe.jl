@@ -21,6 +21,18 @@ from the same assembled elastic–gravitational operator.
 using Pkg; Pkg.add(url = "https://github.com/jrekier/Melinoe.jl")
 ```
 
+From a clone, to run the tests and the notebooks:
+
+```sh
+git clone https://github.com/jrekier/Melinoe.jl
+cd Melinoe.jl
+julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+```
+
+The notebooks in `examples/` need nothing further. Their first cell activates
+`examples/`, which takes Melinoe from the checkout one directory up, and
+instantiates it.
+
 ## Use
 
 ```julia

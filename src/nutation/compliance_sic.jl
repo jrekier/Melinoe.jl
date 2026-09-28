@@ -32,7 +32,7 @@ By default the solve is **static** (`ω² = 0`). `diurnal=true` retains inertia 
 wobble-driven centrifugal deformation occurs at `|ω| = Ω`. Pass `ω²` to override.
 Compare against a *static* tabulation only when `diurnal=false`. With inertia the
 static fluid gauge freedom is lifted, so `dahlenize` is neither needed nor
-permitted here (see `docs/how_elastic_computations_work.md` §6).
+permitted here.
 """
 function sic_compliances(m::PlanetModel; ic_layer::Int = 1, oc_layer::Int = 2,
                          Ω_SI = nothing, ℓ::Int = 2, diurnal::Bool = false, ω² = nothing)

@@ -1,5 +1,7 @@
 using Melinoe
 using Melinoe.Models          # PREM, Mars, Ganymede, Kelvin (qualified submodule)
+# the rotating-NS framework is held back; present only in the author's tree
+isdefined(Melinoe, :Rotating) && eval(:(using Melinoe.Rotating))
 using ApproxFun: Fun, Chebyshev
 using LinearAlgebra: eigen, eigvals, norm, Diagonal
 using Test

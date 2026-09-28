@@ -1,34 +1,13 @@
 .DS_Store
 *.png
 /Manifest.toml
-# personal Claude Code settings, not shared
+# resolve fresh against whatever Julia you have
+/examples/Manifest.toml
 .claude/settings.local.json
 
-# local scratch — regenerable / superseded / personal, kept out of the package
-/_attic/
-/research/
-/scratch/
-/figures/
-
-# internal author notes + probe scripts — kept locally, not shipped as package docs
-/docs/internal/
-
-# data — colleague model CSVs + Mathematica research generators, all local
-/data/
-
-# sibling dev projects (separate, unported — not part of this package)
-/rotating-modes/
-/eigenmethods-beyn/
-
-# held-back research module: rotating-NS, kept local. The figure, both nutation
-# models and the tilt compliances ship with the package.
-/src/nutation/*
-!/src/nutation/flattening.jl
-!/src/nutation/compliance_sic.jl
-!/src/nutation/nutation_sic.jl
-!/src/nutation/compliance_tilt.jl
-!/src/nutation/compliance_bmo.jl
-!/src/nutation/nutation_bmo.jl
+# Held back from the release, kept local: the rotating-NS framework, the models
+# and notebooks that exercise it, and the PyPlot plotting extension. Research
+# material lives outside the package, in ../melinoe-research.
 /src/rotating/
 /src/extras_local.jl
 /src/models/mars_bml.jl
@@ -36,10 +15,3 @@
 /test/extras_local.jl
 /examples/quickstart.ipynb
 /examples/validation/
-
-# node tooling (KaTeX render-checks for the Typora docs) — local only
-/node_modules/
-/package-lock.json
-
-# examples env: resolve fresh against whatever Julia you have
-/examples/Manifest.toml
