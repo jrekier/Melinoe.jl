@@ -11,8 +11,8 @@ incompressible solid is unsupported).
 
 Analytic: `h₂ = (5/2)/(1+μ̃)`, `k₂ = (3/2)/(1+μ̃)`, and an ℓ=2 f-mode at `ω² = 4/5`.
 
-`l₂` depends on how you reach the fluid sphere, since the limits do not commute —
-an inviscid fluid has no shear-traction condition, a μ̃ → 0 solid keeps one:
+`l₂` depends on how the fluid sphere is reached, since the limits do not commute: an
+inviscid fluid has no shear-traction condition, while a μ̃ → 0 solid keeps one.
 
 | route | pinned by | l₂ |
 |---|---|---|

@@ -8,7 +8,7 @@
 
 Earth from PREM (Dziewonski & Anderson 1981): inner core `layers[1]`, fluid outer
 core `layers[2]`, the mantle regions, and the crust. Defaults to the raw published
-model — tabulated moduli, 1 s elastic reference, solid (continentalized) surface.
+model: tabulated moduli, 1 s elastic reference, solid (continentalized) surface.
 
 - `use_aw_oc` — replace the tabulated outer-core `κ` by the Adams-Williamson
   closure `κ = −ρ²g/Dρ`, enforcing neutral stratification `N² = 0` (no spurious
@@ -49,7 +49,7 @@ function PREM(; use_aw_oc::Bool = false, anelastic::Bool = false, ocean::Bool = 
     Vp_UM(r)  = 20.3926 - 12.2569r;    Vs_UM(r)  = 8.9496 - 4.4597r
     # 6151–6346.6 km (24.4–220 km depth) is transversely isotropic in PREM; these are
     # Table I's effective-isotropic approximation (the footnote). Split below into
-    # LVZ (Q_μ=80) and LID (Q_μ=600) — identical velocities, different attenuation.
+    # LVZ (Q_μ=80) and LID (Q_μ=600), identical velocities with different attenuation.
     Vp_Lid(r) = 4.1875 + 3.9382r;      Vs_Lid(r) = 2.1519 + 2.3481r
 
     # ── moduli in solver units (÷345 GPa); anelastic softens μ via Q_μ ────────

@@ -1,8 +1,8 @@
 # ── Mercury, MESSENGER-constrained ────────────────────────────────────────────
 # Liquid Fe-S core | silicate mantle | crust, with an optional solid inner core.
 #
-# The *radii* are solved here, not the densities: mantle and crust densities are
-# inputs, and the core radius and density are the two unknowns closed by the
+# This model solves for the *radii*: mantle and crust densities are inputs, and
+# the core radius and density are the two unknowns closed by the
 # observed mass and mean moment of inertia. `R_core` is therefore an output.
 #
 # Without an inner core the fluid core reaches r=0, so it takes the non-AW
@@ -37,7 +37,7 @@ Mass and mean moment are matched by construction; two outputs are left free and
 serve as the checks.
 
 - `R_core` = 1994.5 km, against the 2020 ± 30 km of Hauck et al. (2013), *JGR
-  Planets* **118**, 1204 — 0.9σ, with nothing tuned against it. Core density
+  Planets* **118**, 1204, at 0.9σ and with nothing tuned against it. Core density
   7253 kg/m³.
 - `k₂` = 0.489, which depends only on the elastic moduli and is not seen by the
   fit, against 0.464 ± 0.023.
@@ -77,7 +77,7 @@ function Mercury(; h_crust_km::Float64 = 26.0, r_inner_km::Float64 = 0.0,
     ρ_f = ρ_mantle + A/xc^3                          # liquid core density
 
     # The closed form returns a core above the mantle top for a moment target near
-    # the uniform-sphere 0.4, so the geometry is checked rather than assumed.
+    # the uniform-sphere 0.4, so the geometry is checked here.
     xc < xm || throw(ArgumentError(
         "Mercury: C/MR² = $Cnd with ρ_mantle = $ρ_mantle needs a core of radius " *
         "$(round(xc*R/1e3, digits=1)) km, at or above the base of the crust " *
@@ -87,7 +87,7 @@ function Mercury(; h_crust_km::Float64 = 26.0, r_inner_km::Float64 = 0.0,
         "$(round(xc*R/1e3, digits=1)) km."))
     ρ_mantle < ρ_f || throw(ArgumentError(
         "Mercury: C/MR² = $Cnd with ρ_mantle = $ρ_mantle gives a core lighter than " *
-        "the mantle (ρ_core = $(round(ρ_f, digits=0)) kg/m³) — a density inversion."))
+        "the mantle (ρ_core = $(round(ρ_f, digits=0)) kg/m³), a density inversion."))
     if !(6000 ≤ ρ_f ≤ 8000)
         @warn "Mercury: C/MR² = $Cnd requires ρ_core = $(round(ρ_f, digits=0)) kg/m³, \
 outside the 6000–8000 range liquid Fe-S can span at Mercury's core pressures. Pass \

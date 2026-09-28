@@ -46,7 +46,7 @@ function Ganymede(; h_ice_km::Float64 = 100.0, n_core::Int = 50, n_solid::Int = 
 
     M_obs, Cnd_obs = 1.482e23, Cnd           # Anderson et al. 1996, Nature 384, 541
     ρ_hyd = (1346.0, 1100.0, 937.0)     # HP ice, ocean, shell
-    ρ_ref = (5777.9, 3291.5)            # core, mantle — starting profile
+    ρ_ref = (5777.9, 3291.5)            # core, mantle; starting profile
 
     if ρ_core !== nothing || ρ_mantle !== nothing
         # ── standard parameterisation: densities from material physics, radii free.
@@ -86,7 +86,7 @@ function Ganymede(; h_ice_km::Float64 = 100.0, n_core::Int = 50, n_solid::Int = 
         if !(4500 ≤ ρ_SI[1] ≤ 7500)
             @warn "Ganymede: h_ice_km = $h_ice_km forces ρ_core = $(round(ρ_SI[1], digits=0)) \
 kg/m³, outside the 4500–7500 range an Fe–FeS core can plausibly span. The radii are frozen, \
-so shell thickness is paid for in core density — pass ρ_core/ρ_mantle for the radii-free \
+so shell thickness is paid for in core density. Pass ρ_core/ρ_mantle for the radii-free \
 parameterisation instead." maxlog = 1
         end
     end

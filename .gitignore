@@ -20,12 +20,13 @@
 /rotating-modes/
 /eigenmethods-beyn/
 
-# held-back research modules — Dumberry tilt compliances + rotating-NS, kept local.
-# The figure and both nutation models ship with the package.
+# held-back research module: rotating-NS, kept local. The figure, both nutation
+# models and the tilt compliances ship with the package.
 /src/nutation/*
 !/src/nutation/flattening.jl
 !/src/nutation/compliance_sic.jl
 !/src/nutation/nutation_sic.jl
+!/src/nutation/compliance_tilt.jl
 !/src/nutation/compliance_bmo.jl
 !/src/nutation/nutation_bmo.jl
 /src/rotating/

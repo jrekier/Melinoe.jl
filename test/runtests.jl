@@ -810,19 +810,21 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         @test abs(cd.recip.ξγ) < 1e-8      # Betti survives ω² ≠ 0
     end
 
-    @testset "SIC nutation (PREM: α's vs MHB, FICN vs observed)" begin
+    @testset "SIC nutation (PREM: α's vs MHB, four modes vs Dumberry Table 2)" begin
         α = sic_alphas(PREM(use_aw_oc=true, anelastic=true); Ω_SI = 7.2921e-5)
         @test α.α1  ≈ 0.946 atol = 3e-3     # Dehant & Mathews eq. 7.152, PREM
         @test α.α2  ≈ 0.829 atol = 3e-3
         @test α.α3  ≈ 0.054 atol = 3e-3
         @test α.α_g ≈ 2.175 atol = 5e-3
-        r = sic_nutation_modes(PREM(use_aw_oc=true, anelastic=true); Ω_SI = 7.2921e-5)
-        @test r.FICN ≈ 475 atol = 5         # observed +475 d — first-principles, no fitting
-        @test -466 < r.FCN < -455           # hydrostatic PREM FCN (obs -430 needs non-hydro CMB)
-        @test r.ICW > 1500                  # inner-core wobble, long prograde period
+        # Dumberry (2009) Table 2, ELASTIC2 column: 400.6, -455.7, 478.7, 2410
+        r = sic_nutation_modes(PREM(use_aw_oc=true, anelastic=false); Ω_SI = 7.2921e-5)
+        @test r.CW   ≈  400.6 rtol = 5e-3
+        @test r.FCN  ≈ -455.7 rtol = 5e-3   # hydrostatic (obs -430 needs a non-hydro CMB)
+        @test r.FICN ≈  478.7 rtol = 5e-3   # K_ICB = 0 (obs ~1025 d needs ICB tractions)
+        @test r.ICW  ≈  2410  rtol = 2e-2
     end
 
-    @testset "SIC nutation transfer (FICN residue suppression; S34 shift)" begin
+    @testset "SIC nutation transfer (FICN residue suppression; tilt shift)" begin
         # Probe each pole at the period this model puts it at, not at a literal.
         m = PREM(use_aw_oc=true, anelastic=true); Ω = 7.2921e-5; Tsid = 2π/Ω/86400
         ν2ω(P) = Tsid/P - 1.0                      # celestial period [d] → terrestrial ω
@@ -831,16 +833,60 @@ prem() = PREM(use_aw_oc = true, anelastic = true)   # AW outer core, anelastic �
         res(P, δ) = abs(sic_nutation_transfer(m, ν2ω(P) + δ; Ω_SI = Ω) * δ)
         rFCN, rFICN = res(r.FCN, 1e-8), res(r.FICN, 1e-8)
         @test rFCN  ≈ 1.0864e-4 rtol = 5e-3        # converged: δ=1e-8 vs 1e-9 agree to 1e-4
-        @test rFICN ≈ 5.024e-7  rtol = 5e-3
+        @test rFICN ≈ 4.963e-7  rtol = 5e-3
         # The FICN is suppressed relative to the FCN by 4.5e-3 — ~6× the inertia
         # ratio A_s/A ≈ 7.3e-4, not by A_s/A itself.
         @test 3e-3 < rFICN/rFCN < 7e-3
-        # S34 moves the FICN pole 476 d → 546 d: the dip in |T| tracks with it
-        T(P; S34=0.0) = abs(sic_nutation_transfer(m, ν2ω(P); Ω_SI=Ω, S34))
-        @test T(475.76)             < T(475.76; S34=-2.70e-4)   # pole leaves 476 d
-        @test T(546.10; S34=-2.70e-4) < T(546.10)              # …and arrives at 546 d
+        # The tilt column leaves the FICN alone: this mode keeps m̃ + m̃_s ≈ ñ_s, so the
+        # S^p channel cancels and only S^g_34 ≪ ν survives (Dumberry 2009, eq. 40).
+        tl = sic_tilt_compliances(m; Ω_SI = Ω)
+        P0 = sic_nutation_modes(m; Ω_SI = Ω).FICN
+        P1 = sic_nutation_modes(m; Ω_SI = Ω, tilt = tl).FICN
+        @test abs(P1 - P0) < 0.01
+        T(P; tilt = nothing) = abs(sic_nutation_transfer(m, ν2ω(P); Ω_SI = Ω, tilt))
+        @test T(P0) > 1e6 * T(P0 + 1.0)                 # |T| peaks sharply at the pole
+        @test T(P0; tilt = tl) > 10 * T(P0 + 1.0)        # the tilted pole sits within 0.01 d
         # far from any pole T→~1 (rigid response)
         @test T(-6798.4) ≈ 1 atol = 0.02
+    end
+
+    @testset "SIC tilt compliances S^g,S^p vs Dumberry (2009) Table 1 (static)" begin
+        m = PREM(use_aw_oc=true, anelastic=false)          # that table is purely elastic
+        Ω = 7.2921e-5
+        r = sic_tilt_compliances(m; Ω_SI = Ω)
+        # gravitational channel: within 0.1% on all three regions
+        @test r.Sg[1] ≈  1.092e-7 rtol = 1e-2
+        @test r.Sg[2] ≈  3.412e-7 rtol = 1e-2
+        @test r.Sg[3] ≈ -1.813e-6 rtol = 1e-2
+        # pressure channel, published body-force-only convention: within 3.7%
+        @test r.Sp[1] ≈ -1.683e-8 rtol = 4e-2
+        @test r.Sp[2] ≈  1.639e-6 rtol = 4e-2
+        @test r.Sp[3] ≈ -2.686e-4 rtol = 4e-2
+        # the 2008 lumped S14, a near-cancelling whole-Earth residual: 0.15%
+        @test r.lumped[1] ≈ 9.237e-8 rtol = 1e-2
+
+        # k̃ = −(S^g34 + S^p34)/e_s, the factor that lengthens the ICW (his 0.1117)
+        s = Melinoe._sic_setup(m; Ω_SI = Ω)
+        @test -(r.Sg[3] + r.Sp[3])/s.es ≈ 0.1117 rtol = 4e-2
+
+        # Table 2, ELASTIC2 → FULL: the tilt column lengthens the ICW by 12.6% and
+        # leaves the other three modes where they were.
+        e2 = sic_nutation_modes(m; Ω_SI = Ω)
+        fl = sic_nutation_modes(m; Ω_SI = Ω, tilt = r)
+        @test e2.ICW  ≈ 2410 rtol = 2e-2
+        @test fl.ICW  ≈ 2715 rtol = 2e-2
+        @test fl.ICW / e2.ICW ≈ 1.126 rtol = 2e-2
+        @test fl.FICN ≈ e2.FICN rtol = 1e-3       # m̃ + m̃_s ≈ ñ_s ⇒ S^p cancels here
+        @test fl.CW   ≈ e2.CW   rtol = 1e-3
+
+        # S14/S24/S34 place a coefficient of ñ_s alone. For the ICW that is the same
+        # problem, since m̃ + m̃_s ≈ 0 there, so the two call shapes must agree.
+        lump = sic_nutation_modes(m; Ω_SI = Ω, S14 = r.lumped[1], S24 = r.lumped[2],
+                                     S34 = r.lumped[3])
+        @test lump.ICW ≈ fl.ICW rtol = 1e-3
+        @test lump.FICN > fl.FICN + 40           # …but not for the PFCN
+        # the released kwargs still work on the transfer function
+        @test sic_nutation_transfer(m, -0.9979; Ω_SI = Ω, S34 = -2.7e-4) isa Number
     end
 
     @testset "BMO nutation: a fluid core under a fluid layer" begin

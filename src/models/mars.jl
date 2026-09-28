@@ -1,6 +1,6 @@
 # ── Mars, InSight-constrained three-layer model ───────────────────────────────
 # Liquid iron core | silicate mantle | basaltic crust. No inner core, so the fluid
-# core is layers[1], reaches the centre, and needs the non-AW fluid operator —
+# core is layers[1], reaches the centre, and needs the non-AW fluid operator, since
 # Adams-Williamson would give κ→0 at r=0.
 #
 # Geometry and bulk properties are from the literature (see the docstring); the
@@ -27,7 +27,7 @@ silicate mantle, crust.
 
 The mean radius is the IAU 3389.5 km. The moment-of-inertia target used here is the
 **mean** moment `I = C(1 − 2H/3)` with `H = 0.005364`, renormalised to the mean
-radius, since the model is spherically symmetric — `I/(M R²) = 0.36401`.
+radius, since the model is spherically symmetric, giving `I/(M R²) = 0.36401`.
 
 Mass and moment of inertia are matched by construction; `k₂` is left free and is
 the check on the elastic moduli. The model gives `k₂ = 0.1784`, 0.6σ from the

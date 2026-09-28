@@ -3,9 +3,9 @@
 # demand a metal core (Gomez Casajus et al. 2021).
 #
 # Densities come from material physics; BOTH interior radii are solved from the observed
-# mass and C/MR². The H2O layer is therefore an output, and the ocean is whatever is left
-# between the solved mantle top and the prescribed ice shell. Two unknowns, two
-# constraints, by Newton — there is no closed form once both radii are free.
+# mass and C/MR². The H2O layer is therefore an output: the ocean occupies the gap
+# between the solved mantle top and the prescribed ice shell. Two unknowns against two
+# constraints, solved by Newton, since no closed form exists once both radii are free.
 
 """
     Europa(; h_ice_km=20.0, ρ_core=5150.0, ρ_mantle=3300.0, n=40) -> PlanetModel
@@ -22,9 +22,9 @@ mass and moment of inertia.
 | orbital period | 3.551 d | — |
 
 Mass and moment of inertia are matched by construction. With the defaults the core comes
-out near 640 km under a 1460 km mantle, leaving an H2O layer of about 100 km — a core at
-the eutectic Fe-FeS density, the lightest composition that still works. A mantle at
-3800 kg/m³ needs no core at all and is rejected.
+out near 640 km under a 1460 km mantle, leaving an H2O layer of about 100 km. That core
+sits at the eutectic Fe-FeS density, the lightest composition the constraints admit. A
+mantle at 3800 kg/m³ requires no core and is rejected.
 
 `pressure_love(m; forcing_layer = 3)` gives the ocean's pressure Love numbers.
 """

@@ -1,11 +1,11 @@
 # ── Callisto ──────────────────────────────────────────────────────────────────
 # Rock-ice interior | ocean | ice shell. C/MR² = 0.3549 is the highest of the Galilean
 # satellites and too high for full differentiation (Anderson et al. 2001): the interior
-# keeps its ice, so it is modelled as one rock-ice mixture rather than core + mantle.
+# keeps its ice, so it is modelled as a single rock-ice mixture layer.
 #
 # The mixture DENSITY and its RADIUS are both solved from the observed mass and C/MR².
 # Both constraints are linear in that density at fixed radius, so eliminating it leaves
-# x² = B/A in closed form — the same algebra as `Mercury`.
+# x² = B/A in closed form, the same algebra as `Mercury`.
 
 """
     Callisto(; h_ice_km=100.0, ρ_ocean=1100.0, ρ_ice=937.0, n=40) -> PlanetModel

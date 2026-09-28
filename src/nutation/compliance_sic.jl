@@ -4,8 +4,8 @@
 # three regions (whole Earth, fluid outer core, solid inner core) × three
 # centrifugal forcing channels (all layers = tidal, OC only, IC only), read with
 # the same F-integral machinery as `compliances`. Reproduces κ, ξ, γ, β and adds
-# the inner-core columns/rows ζ, δ, θ, χ, ν — the MHB (Mathews–Herring–Buffett
-# 2002) SIC compliance set:
+# the inner-core columns/rows ζ, δ, θ, χ, ν, which form the MHB
+# (Mathews–Herring–Buffett 2002) SIC compliance set:
 #
 #         │ tidal (m̃)   OC (m̃_f)    IC (m̃_s)
 #   whole │ κ            ξ            ζ
@@ -22,17 +22,17 @@ Deformation compliances for a model with a **solid inner core** (`ic_layer`,
 `[0,d]`) inside a **fluid outer core** (`oc_layer`, `[d,b]`). Returns a
 NamedTuple with the nine MHB SIC compliances `κ,ξ,ζ` (whole), `γ,β,δ` (outer
 core), `θ,χ,ν` (inner core), the reduced moments `Ât,Âf,Âs`, and `recip` (three
-Betti residuals — should be ~0). `κ,ξ,γ,β` match `compliances`; the inner-core
+Betti residuals, which should be ~0). `κ,ξ,γ,β` match `compliances`; the inner-core
 columns/rows `ζ,δ,θ,χ,ν` are the new SIC terms. `Ω_SI` defaults to the model's
 own rotation rate.
 
 By default the solve is **static** (`ω² = 0`). `diurnal=true` retains inertia at
 `ω² = Ω̂²`: a forced nutation at celestial frequency `ν ≈ 0` is a wobble at
-`σ = ν−1 ≈ −1` in the terrestrial frame — retrograde diurnal — so the
+`σ = ν−1 ≈ −1` in the terrestrial frame, i.e. retrograde diurnal, so the
 wobble-driven centrifugal deformation occurs at `|ω| = Ω`. Pass `ω²` to override.
-Compare against a *static* tabulation only when `diurnal=false`. Note that with
-inertia the static fluid gauge freedom is lifted, so `dahlenize` is neither needed
-nor permitted here (see `docs/how_elastic_computations_work.md` §6).
+Compare against a *static* tabulation only when `diurnal=false`. With inertia the
+static fluid gauge freedom is lifted, so `dahlenize` is neither needed nor
+permitted here (see `docs/how_elastic_computations_work.md` §6).
 """
 function sic_compliances(m::PlanetModel; ic_layer::Int = 1, oc_layer::Int = 2,
                          Ω_SI = nothing, ℓ::Int = 2, diurnal::Bool = false, ω² = nothing)
@@ -43,11 +43,11 @@ function sic_compliances(m::PlanetModel; ic_layer::Int = 1, oc_layer::Int = 2,
     Ω̂² = (Ω_SI / m.ω_unit)^2
 
     # Inertia. A forced nutation at celestial frequency ν ≈ 0 is a wobble at σ = ν−1 ≈ −1
-    # in the terrestrial frame — i.e. RETROGRADE DIURNAL — so the wobble-driven centrifugal
+    # in the terrestrial frame, i.e. RETROGRADE DIURNAL, so the wobble-driven centrifugal
     # deformation happens at |ω| = Ω and `ω² = Ω̂²`. `diurnal=true` is that; `ω²` overrides.
     ω²_use = ω² !== nothing ? ω² : (diurnal ? Ω̂² : 0.0)
     # Three centrifugal channels, one forced solve each; regions read with `moment`
-    # (S_ij = inertia_i / A_i, A_i = (8π/3)Âᵢ — same F-integral as `compliances`).
+    # (S_ij = inertia_i / A_i, A_i = (8π/3)Âᵢ, the same F-integral as `compliances`).
     cf(ls) = Potential(r -> r^ℓ; amplitude = Ω̂²/3, layers = ls)
     ft = forced(m, cf(:all);     ω² = ω²_use, ℓ)     # tidal (all layers)
     ff = forced(m, cf(oc_layer); ω² = ω²_use, ℓ)     # outer core only

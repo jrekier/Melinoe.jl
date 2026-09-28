@@ -41,6 +41,7 @@ include("core/load.jl")
 include("nutation/flattening.jl")
 include("nutation/compliance_sic.jl")     # solid inner core (Mathews–Herring–Buffett)
 include("nutation/nutation_sic.jl")
+include("nutation/compliance_tilt.jl")    # inner-core tilt compliances (Dumberry)
 include("nutation/compliance_bmo.jl")     # fluid core under a basal magma layer
 include("nutation/nutation_bmo.jl")
 # ── planet models — qualified only, e.g. `Melinoe.Models.PREM()` ──────────────
@@ -77,7 +78,8 @@ export
     # rotation: hydrostatic figure
     flattening,
     # nutation with a solid inner core (MHB 4×4)
-    sic_compliances, sic_alphas, sic_nutation_modes, sic_nutation_transfer,
+    sic_compliances, sic_alphas, sic_tilt_compliances,
+    sic_nutation_modes, sic_nutation_transfer,
     # nutation with a basal magma layer (3×3)
     bmo_compliances, nutation_modes, nutation_transfer, nutation_residues,
     ekman_K_bc, ekman_K_bm,
