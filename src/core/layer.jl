@@ -5,9 +5,9 @@
 #   κ  — bulk modulus  (Inf ⇒ incompressible)
 #   μ  — shear modulus (0   ⇒ fluid)
 #   ρ₀ — background density
-#   g₀ — background gravity g₀(r) = dφ₀/dr, supplied analytically (see
-#        `self_gravity`), which avoids the 1/r² singularity that appears if it
-#        is differentiated from a Chebyshev-expanded potential.
+#   g₀ — background gravity g₀(r) = dφ₀/dr. Supplied analytically by
+#        `self_gravity`. Differentiating a Chebyshev-expanded φ₀ instead
+#        introduces a 1/r² singularity.
 
 @kwdef struct Layer
     domain
@@ -17,8 +17,8 @@
     ρ₀  :: Function
     g₀  :: Function
     aw  :: Bool = true   # fluid Poisson closure. true: Adams-Williamson, ρ₀′=−ρ₀²g/κ
-                         # (adiabatic shell). false: keep the actual ρ₀′ — needed for a
-                         # core reaching the centre, or a subadiabatic tabulated κ.
+                         # (adiabatic shell). false: keep the actual ρ₀′, required for
+                         # a core reaching the centre or a subadiabatic tabulated κ.
     dahlen :: Bool = false  # fluid static closure (Dahlen 1974); see `dahlenize`.
                             # Static solves only. Ignored for solids.
     ν_SI :: Float64 = 0.0   # kinematic viscosity [m²/s]; 0 ⇒ inviscid. Unused by the

@@ -2,7 +2,7 @@
 #
 # `build_model` handles the non-dimensionalisation (modulus unit ρ̄gR =
 # (4πG/3)ρ̄²R²), the self-consistent gravity, and the Layer boilerplate. `g₀`
-# always comes from `self_gravity`, never hand-written per model.
+# always comes from `self_gravity`.
 
 const G_SI = 6.674e-11
 const Ω_EARTH = 7.2921e-5   # rad/s
@@ -14,8 +14,8 @@ Holds the `Vector{Layer}` plus the non-dimensional metadata needed to convert
 back to SI: `R_SI` (surface radius, m), `ρ̄_SI` (mean density, kg/m³),
 `ω_unit = √(4πGρ̄/3)` (rad/s per dimensionless ω), `p_unit = (4πG/3)ρ̄²R²`
 (Pa per dimensionless modulus), and the body rotation rate `Ω_SI` (rad/s;
-0 ⇒ non-rotating). Rotation is a body property, viscosity a per-layer
-material property (`Layer.ν_SI`).
+0 ⇒ non-rotating). Viscosity is instead a per-layer material property,
+`Layer.ν_SI`.
 """
 struct PlanetModel
     name   :: String
@@ -51,7 +51,8 @@ radial_profile(m::PlanetModel, field::Symbol) =
     layer_at(m::PlanetModel, r) -> Int
 
 Index of the layer containing radius `r`; interfaces resolve to the layer below.
-`DomainError` outside the body, since the layer profiles extrapolate silently.
+Throws `DomainError` outside the body: the layer profiles carry no bound check and
+would return an extrapolated value.
 """
 function layer_at(m::PlanetModel, r)
     r0 = leftendpoint(m.layers[1].domain)
@@ -80,7 +81,7 @@ formulation: the fluid interior carries only the closed δφ equation (source
 inconsistency of a stratified fluid at a solid wall
 (`examples/2_dahlen_fluid_tutorial.ipynb`).
 
-**Static solves only** — fluid inertia is dropped, so `free_modes` rejects a
+**Static solves only**: fluid inertia is dropped, so `free_modes` rejects a
 dahlenized model.
 """
 dahlenize(m::PlanetModel) = PlanetModel(m.name * "+dahlen",
@@ -124,13 +125,12 @@ love_numbers(m::PlanetModel, ℓ::Int = 2; ω² = 0.0) = read_love(forced(m, Tid
 
 Free spheroidal frequencies at degree `ℓ`, ascending. `T_min` are periods in
 minutes and `vs[:, sorted_idx[k]]` is the k-th eigenvector, in the full
-`[U; V/P; δφ]` basis. `recover` is `identity`, kept so callers need not care.
+`[U; V/P; δφ]` basis. `recover` maps an eigenvector back into that basis and is
+`identity`, since no field is eliminated before the solve.
 
-`B` is singular — Poisson carries no time derivative — so the pencil is solved as
-it stands and `solve_modes` discards what the singularity produces. Eliminating
-`δφ` first by Schur complement would halve the work but needs `A_zz⁻¹`, whose
-condition number reaches 1e13 on PREM; the direct route is better behaved and
-matches Kelvin's analytic f-mode to 2e-13.
+`B` is singular, since Poisson carries no time derivative, so the pencil is solved as
+it stands and `solve_modes` discards what the singularity produces. Matches
+Kelvin's analytic f-mode to 2e-13.
 
 Errors on a `dahlenize`d model, which has no fluid inertia.
 """

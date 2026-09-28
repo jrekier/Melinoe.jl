@@ -28,17 +28,17 @@ and Poisson equations (`U`, `V`, `φ`); columns are the fields `U` (radial
 displacement), `V` (tangential displacement in solids, Lagrangian pressure `P` in
 fluids) and `φ` (`δφ`). So `A_Vφ` is the δφ column of the tangential row.
 
-`B_UU`, `B_VU`, `B_VV` are the mass blocks (no `B_φφ` — self-gravity is
-instantaneous). `A_φΦ` couples the Poisson row to an applied potential, nonzero only
-under the Dahlen closure. Also returns `fluid`, the space `S`, the derivative `D`.
+`B_UU`, `B_VU`, `B_VV` are the mass blocks. There is no `B_φφ`: self-gravity is
+instantaneous. `A_φΦ` couples the Poisson row to an applied potential and is nonzero
+only under the Dahlen closure. Also returns `fluid`, the space `S`, the derivative `D`.
 """
 function gravitoelastic_blocks(layer::Layer, ℓ::Int, is_inner::Bool)
     dom = layer.domain
     n   = layer.n
-    # The element type follows the moduli. A viscoelastic μ(ω) is complex, which makes
-    # every block complex; the solve, the BCs and read_love are all generic already, so
-    # this is the only place the choice has to be made. Real moduli reduce to Float64
-    # exactly. κ = Inf (incompressible) is a Float64 and promotes harmlessly.
+    # Element type follows the moduli: a viscoelastic μ(ω) is complex and makes every
+    # block complex. The solve, the BCs and read_love are generic, so the type is
+    # fixed here and nowhere else. Real moduli give Float64, and κ = Inf
+    # (incompressible) is itself a Float64.
     _rmid = (leftendpoint(dom) + rightendpoint(dom)) / 2
     T = promote_type(Float64, typeof(layer.μ(_rmid)), typeof(layer.κ(_rmid)))
     S = is_inner ? Jacobi(0, ℓ, dom) : Chebyshev(dom)
@@ -49,7 +49,7 @@ function gravitoelastic_blocks(layer::Layer, ℓ::Int, is_inner::Bool)
     ρ₀  = Fun(layer.ρ₀, S)
     Dμ  = μ'
     Dρ₀ = ρ₀'
-    # r²·g₀ = 3·(enclosed mass) — the polynomial combination (see file header).
+    # r²·g₀ = 3·(enclosed mass), the polynomial combination (see file header).
     r²g₀ = Fun(r -> r^2 * layer.g₀(r), S)
 
     if is_fluid(layer)

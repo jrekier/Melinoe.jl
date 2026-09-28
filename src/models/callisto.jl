@@ -20,9 +20,8 @@ sets the shell; the ocean thickness follows from the mass and moment of inertia.
 | `C/MR²` | 0.3549 ± 0.0042 | Anderson et al. 2001 |
 | orbital period | 16.689 d | — |
 
-The solved interior density (~1980 kg/m³ with the defaults) sits between ice and rock,
-which is the point: Callisto never fully separated. Mass and moment of inertia are matched
-by construction; the Love numbers are predictions.
+The solved interior density (~1980 kg/m³ with the defaults) sits between ice and rock.
+Mass and moment of inertia are matched by construction; the Love numbers are predictions.
 """
 function Callisto(; h_ice_km::Float64 = 100.0, ρ_ocean::Float64 = 1100.0,
                     ρ_ice::Float64 = 937.0, n::Int = 40)

@@ -38,11 +38,11 @@ Assemble the global generalised-eigenvalue pencil `A x = λ B x` for the
 multi-layer gravito-elastic system at harmonic degree `ℓ`. Variables are grouped
 `[U₁…U_L; V₁…V_L; δφ₁…δφ_L]` (V is the Lagrangian pressure P in fluid layers).
 Returns the two matrices, the per-layer operator blocks `ops`, the mode counts
-`ns`, and `jrhs` — the list of junction rows that carry an applied-potential RHS
+`ns`, and `jrhs`, the list of junction rows that carry an applied-potential RHS
 (nonempty only for Dahlen-reduced fluids; consumed by `potential_forcing`).
 
-BC/junction rows are rescaled to unit ∞-norm at the end (Bmat and all standard
-RHS are zero on those rows, so this is invisible downstream).
+BC/junction rows are rescaled to unit ∞-norm at the end. Bmat and all standard
+RHS are zero on those rows, so the solution is unchanged.
 """
 function assemble_planet(layers::Vector{Layer}, ℓ::Int)
     L   = length(layers)
@@ -50,14 +50,14 @@ function assemble_planet(layers::Vector{Layer}, ℓ::Int)
     flu = [is_fluid(l) for l in layers]
     N   = 3 * sum(ns)
 
-    # Blocks first: they carry the element type, which is complex when any modulus is
+    # Blocks first: they carry the element type, complex if any modulus is complex
     # (a viscoelastic μ(ω)) and Float64 otherwise.
     ops  = [gravitoelastic_blocks(layers[i], ℓ, i == 1) for i in 1:L]
     T    = promote_type(Float64, (eltype(o.A_UU) for o in ops)...)
 
     Amat = zeros(T, N, N)
     Bmat = zeros(T, N, N)
-    bc_rows = Int[]   # rows holding BC/junction equations — rescaled at the end
+    bc_rows = Int[]   # rows holding BC/junction equations, rescaled at the end
     # Junction rows that carry an applied-potential RHS (Dahlen-reduced fluids
     # only): potential_forcing adds coef·amplitude·potential(r0) to row when the
     # named layer is forced. Empty for standard formulations.
@@ -225,9 +225,9 @@ function assemble_planet(layers::Vector{Layer}, ℓ::Int)
         push!(bc_rows, row_U(i)[end], row_V(i)[end], row_δφ(i)[end])
     end
 
-    # Rescale BC/junction rows to unit ∞-norm — invisible downstream (Bmat and the
-    # standard RHS vanish there) but tightens conditioning. jrhs coefficients are
-    # rescaled identically so potential_forcing stays consistent.
+    # Rescale BC/junction rows to unit ∞-norm. Bmat and the standard RHS vanish on
+    # these rows, so the solution is unchanged and the conditioning improves. jrhs
+    # coefficients are rescaled by the same factors.
     rowscale = Dict{Int, Float64}()
     for k in unique(bc_rows)
         s = maximum(abs, view(Amat, k, :))

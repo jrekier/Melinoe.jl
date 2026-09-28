@@ -1,8 +1,8 @@
 # ── Tabulated-model I/O ───────────────────────────────────────────────────────
 #
 # Reads the usual published layout: one row per sampled radius, a header naming the
-# columns, optionally with `[unit="…"]` annotations. `examples/PREM_1s.csv` is a
-# worked example (real PREM, as distributed).
+# columns, optionally with `[unit="…"]` annotations. `examples/PREM_1s.csv` is PREM
+# as distributed.
 #
 # Columns are matched by name, case-insensitively, and anything unrecognised (Q_μ,
 # Q_κ, …) is ignored:
@@ -14,9 +14,9 @@
 #              vpv, vph, vsv, vsh [, eta]                 (transversely isotropic)
 #   layer      layer | region | name                      (optional, see below)
 #
-# Layers: with a `layer` column, rows are grouped by it. Without one — the usual
-# published convention — a REPEATED radius marks a discontinuity and starts a new
-# layer, which is how PREM delimits its regions.
+# Layers: with a `layer` column, rows are grouped by it. Without one, a REPEATED
+# radius marks a discontinuity and starts a new layer. That is the published
+# convention, and how PREM delimits its regions.
 
 const _CSV_ALIASES = Dict{Symbol,Vector{String}}(
     :layer => ["layer", "region", "name"],
@@ -35,7 +35,7 @@ _unit_of(h) = (m = match(r"unit\s*=\s*\"?([^\"\]]*)", h);
                m === nothing ? "" : replace(lowercase(strip(m.captures[1])), " " => ""))
 
 # Scale a declared unit to SI. An empty unit means the column is already SI, so an
-# unannotated km column would read 1000× small — caught by the sanity check on R.
+# unannotated km column reads 1000× small. The sanity check on R catches that.
 function _unit_scale(kind::Symbol, u::AbstractString, col::AbstractString)
     tbl = kind === :length   ? Dict(""=>1.0, "m"=>1.0, "km"=>1e3) :
           kind === :density  ? Dict(""=>1.0, "kg/m^3"=>1.0, "kg/m3"=>1.0,
@@ -48,7 +48,7 @@ function _unit_scale(kind::Symbol, u::AbstractString, col::AbstractString)
     return tbl[u]
 end
 
-# Parse a field, tolerating quoting and Mathematica's a*^b exponent form.
+# Parse a field. Accepts quoting and Mathematica's a*^b exponent form.
 _unquote(s) = strip(s, ['"', '\'', ' ', '\t'])
 _numstr(s)  = replace(_unquote(s), "*^" => "e")
 
@@ -104,8 +104,8 @@ function _read_csv_table(path)
             continue
         end
         kind = kind_of(sym)
-        # +Inf is meaningful in a modulus or velocity column — it is how an
-        # incompressible layer is written — but nowhere else.
+        # +Inf is meaningful in a modulus or velocity column, where it denotes an
+        # incompressible layer, and nowhere else.
         inf_ok = kind in (:modulus, :velocity)
         v = Vector{Float64}(undef, length(rows))
         for (k, r) in enumerate(rows)
@@ -122,10 +122,10 @@ function _read_csv_table(path)
     return (; cols, meta)
 end
 
-# Elastic moduli (Pa) from whatever the file supplied. Velocities are reduced to the
-# Voigt isotropic equivalent, which for A=ρVph², C=ρVpv², N=ρVsh², L=ρVsv²,
-# F=η(A−2L) is  κ = (C+4A−4N+4F)/9,  μ = (C+A+6L+5N−2F)/15  — exactly ρVp²−4ρVs²/3
-# and ρVs² when the medium is isotropic.
+# Elastic moduli (Pa) from whichever columns the file supplied. Velocities are
+# reduced to the Voigt isotropic equivalent: for A=ρVph², C=ρVpv², N=ρVsh², L=ρVsv²,
+# F=η(A−2L),  κ = (C+4A−4N+4F)/9  and  μ = (C+A+6L+5N−2F)/15, which reduce to
+# ρVp²−4ρVs²/3 and ρVs² for an isotropic medium.
 function _moduli_from(cols, ρ, path)
     if haskey(cols, :κ) && haskey(cols, :μ)
         return cols[:κ], cols[:μ]
@@ -142,8 +142,8 @@ function _moduli_from(cols, ρ, path)
     F = η .* (A .- 2 .* L)
     κ = (C .+ 4A .- 4N .+ 4F) ./ 9
     μ = (C .+ A .+ 6L .+ 5N .- 2F) ./ 15
-    # An infinite vp marks an incompressible layer. The Voigt shear combination then
-    # degenerates to Inf − Inf, so take μ from the shear velocities directly.
+    # An infinite vp marks an incompressible layer. The Voigt shear combination
+    # degenerates to Inf − Inf there, so μ comes from the shear velocities directly.
     for k in eachindex(κ)
         isfinite(A[k]) && isfinite(C[k]) && continue
         κ[k] = Inf
@@ -152,9 +152,9 @@ function _moduli_from(cols, ρ, path)
     return κ, μ
 end
 
-# Lowest-degree least-squares fit reaching `rtol`. A degree whose coefficients blow
-# past 100× the data scale is skipped as ill-conditioned; if nothing resolves the
-# layer the BEST fit is returned, not the last, together with its relative error.
+# Lowest-degree least-squares fit reaching `rtol`. A degree whose coefficients exceed
+# 100× the data scale is skipped as ill-conditioned. If no degree resolves the layer,
+# the fit with the smallest error is returned together with that error.
 function _lsq_fit(ts, ys, maxdeg; rtol = 1e-3)
     scale = maximum(abs, ys) + eps()
     best_c, best_err = [sum(ys)/length(ys)], Inf
@@ -174,10 +174,10 @@ end
 Sample a `PlanetModel` onto `n` radii per layer and write it as CSV. Both layouts
 `load_planet_csv` accepts can be written, and both round-trip:
 
-- `:moduli` — `layer, radius [m], density [kg/m³], K [Pa], mu [Pa]`. An explicit
-  layer column, SI throughout, moduli exactly as the model stores them.
-- `:velocity` — `radius [km], depth [km], density [g/cm³], vp [km/s], vs [km/s]`,
-  the layout tabulated models use: no layer column, boundaries marked by repeated
+- `:moduli`: `layer, radius [m], density [kg/m³], K [Pa], mu [Pa]`, with an explicit
+  layer column, SI throughout, and the moduli as the model stores them.
+- `:velocity`: `radius [km], depth [km], density [g/cm³], vp [km/s], vs [km/s]`, the
+  layout tabulated models use, with no layer column, boundaries marked by repeated
   radii, ordered surface inward. Compare `examples/PREM_1s.csv`.
 
 Rotation is carried in a header comment either way. An incompressible layer
@@ -220,7 +220,7 @@ end
 Build a `PlanetModel` from a tabulated interior model. Columns are matched by name
 (see the top of this file); a position column (`radius` or `depth`), `density`, and
 either moduli (`K`, `mu`) or velocities (`vp`/`vs`, or `vpv`/`vph`/`vsv`/`vsh` with
-optional `eta`) are required. Everything else — `Q-mu`, `Q-kappa`, … — is ignored.
+optional `eta`) are required. Any other column (`Q-mu`, `Q-kappa`, …) is ignored.
 `[unit="…"]` annotations in the header are honoured: km, g/cm³, km/s, GPa and their
 SI equivalents. Rows may run inward or outward.
 
@@ -228,10 +228,10 @@ Layers come from a `layer` column if there is one, else from repeated radii, the
 convention published models use to mark a discontinuity. A layer whose `|μ|` never
 exceeds `μ_tol` is treated as inviscid fluid and given the non-AW closure.
 
-Per-layer profiles are least-squares polynomials of degree ≤ `poly_degree`, and any
-layer that cannot be resolved to relative RMS `rtol` is reported as a warning rather
-than fitted silently. `Ω_SI` sets the rotation rate, defaulting to a value recorded
-in a header comment (as `write_planet_csv` emits) and otherwise to 0.
+Per-layer profiles are least-squares polynomials of degree ≤ `poly_degree`. A layer
+that cannot be resolved to relative RMS `rtol` raises a warning. `Ω_SI` sets the
+rotation rate, defaulting to a value recorded in a header comment (as
+`write_planet_csv` emits) and otherwise to 0.
 
 ```julia
 m = load_planet_csv(joinpath(pkgdir(Melinoe), "examples", "PREM_1s.csv"))
@@ -246,8 +246,8 @@ function load_planet_csv(path; name = splitext(basename(path))[1], poly_degree::
     Kv, μv = _moduli_from(cols, ρv, path)
     Kv = Kv .* modulus_scale;  μv = μv .* modulus_scale
 
-    # position: prefer radius; from depth alone the deepest sample is taken as the
-    # centre, so r = max(depth) − depth (the reach-the-centre check below confirms it)
+    # position: prefer radius. From depth alone the deepest sample is taken as the
+    # centre, r = max(depth) − depth, which the reach-the-centre check below confirms.
     r_m = haskey(cols, :r)     ? cols[:r] :
           haskey(cols, :depth) ? maximum(cols[:depth]) .- cols[:depth] :
           throw(ArgumentError("$path: no position column (radius | depth)"))
@@ -269,8 +269,8 @@ sample, in any radial order.
 Layers come from `layer` (a `Vector` of names, one per sample) if given, else from
 repeated radii. Per-layer profiles are least-squares polynomials of degree ≤
 `poly_degree`; a layer whose `|μ|` never exceeds `μ_tol` is inviscid fluid and takes
-the non-AW closure. `load_planet_csv` and `load_planet_profiles` are this function
-behind a parser.
+the non-AW closure. `load_planet_csv` and `load_planet_profiles` call this function
+after parsing their respective formats.
 """
 function planet_from_table(r_m::AbstractVector, ρv::AbstractVector, Kv::AbstractVector,
                            μv::AbstractVector; layer = nothing, name::AbstractString = "table",
@@ -342,7 +342,8 @@ function planet_from_table(r_m::AbstractVector, ρv::AbstractVector, Kv::Abstrac
         ed < rtol || push!(poor, "$(order[k]) density (rel. RMS $(round(ed, sigdigits=2)))")
         push!(cρ, cd)
 
-        # moduli fit on t = (x-xc)/Δ ∈ [-1,1], so a thin layer stays well conditioned
+        # moduli fit on t = (x-xc)/Δ ∈ [-1,1]; without the rescaling a thin layer
+        # gives an ill-conditioned Vandermonde system
         xc = (first(xs) + last(xs))/2; Δ = max((last(xs) - first(xs))/2, eps())
         ts = (xs .- xc) ./ Δ
         for (q, ys, dest) in (("K", Ks, κc), ("mu", μs, isfl ? nothing : μc))
@@ -394,8 +395,8 @@ Each `## layer` line opens a block and names it (the text between `—` and the 
 column carries a `[unit]` (`r[m]`, `K[Pa]`, …). A `(fluid)`/`(solid)` tag on the header
 is checked against `μ`; without a tag the fluid test is `|μ| < μ_tol`. Lines whose
 first field is not a number are skipped, so notes after the blocks are ignored.
-`Ω_SI` defaults to an `Omega_SI=…` found in any `#` line, else 0. From the samples on
-this is [`planet_from_table`](@ref).
+`Ω_SI` defaults to an `Omega_SI=…` found in any `#` line, else 0. Sample handling
+onward is [`planet_from_table`](@ref).
 """
 function load_planet_profiles(path; name = splitext(basename(path))[1], Ω_SI = nothing,
                               poly_degree::Int = 5, μ_tol = 1e7, rtol = 1e-3)
@@ -466,9 +467,9 @@ Recover each layer's `ρ, K, μ` as monomial coefficients in `x = r/R` (SI: kg/m
 Pa), one entry `(layer, q, a, b, fluid, err, c)` each.
 
 Fits at Chebyshev nodes with the lowest degree reaching relative RMS < `rtol`. A
-genuinely polynomial profile terminates at its true degree with `err ~ 1e-16`; a
-rational one (the Adams–Williamson outer-core `κ`) stops before the monomial
-basis degrades and reports its honest `err`.
+polynomial profile terminates at its true degree with `err ~ 1e-16`. A rational one,
+such as the Adams–Williamson outer-core `κ`, stops before the monomial basis
+degrades and reports the error it reached.
 """
 function planet_coeffs(model::PlanetModel; degmax::Int = 12, rtol = 1e-9)
     R = model.R_SI; ρ̄ = model.ρ̄_SI; p_u = model.p_unit
@@ -485,11 +486,11 @@ function planet_coeffs(model::PlanetModel; degmax::Int = 12, rtol = 1e-9)
                 c = ([x^j for x in xs, j in 0:d]) \ ys
                 err = rms(c)
                 if err < rtol                                     # exact polynomial
-                    c[abs.(c) .< 1e-8*scale] .= 0.0               # snap roundoff junk
+                    c[abs.(c) .< 1e-8*scale] .= 0.0               # snap roundoff to zero
                     best_c, best_err = c, err
                     break
                 end
-                # skip ill-conditioned intermediate fits, but keep escalating —
+                # skip ill-conditioned intermediate fits and keep escalating, since
                 # an exact higher degree may still be reached
                 maximum(abs, c) > 100*scale && continue
                 err < best_err && ((best_c, best_err) = (c, err))
@@ -506,7 +507,7 @@ end
 
 Write `planet_coeffs(model)` in the layout of PREM Table I: one block per layer
 with its radius range, each quantity an explicit polynomial in `x = r/R`. SI
-units. Exact polynomials print bare; fitted ones carry their relative RMS error.
+units. Exact polynomials print bare, fitted ones with their relative RMS error.
 """
 function write_planet_coeffs(model::PlanetModel, path; degmax::Int = 12, rtol = 1e-9)
     fits = planet_coeffs(model; degmax, rtol)

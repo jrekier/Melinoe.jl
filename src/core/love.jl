@@ -1,7 +1,7 @@
 # ── Static / dynamic tidal solve and Love numbers ─────────────────────────────
 #
 # Solve (A − ω²B)·x = f for an applied external potential (default Φ_T = r^ℓ, unit
-# amplitude at the surface). Derived step by step in examples/1_love_numbers_tutorial.ipynb.
+# amplitude at the surface). Derived in examples/1_love_numbers_tutorial.ipynb.
 #
 # Sign convention: the code carries gravity as −g (inward), so δφ is the
 # self-gravity perturbation and the geophysics Love numbers are h = U(1) ≤ 0,

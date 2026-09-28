@@ -1,15 +1,13 @@
 # ── Mercury, MESSENGER-constrained ────────────────────────────────────────────
 # Liquid Fe-S core | silicate mantle | crust, with an optional solid inner core.
-# The core reaches the centre when there is no inner core, so it takes the non-AW
-# fluid operator — Adams-Williamson would give κ→0 at r=0 (and the layer densities
-# are constant anyway, so ρ₀′ = 0 and AW is simply the wrong closure).
 #
-# Unlike Mars and Ganymede, the *radii* are solved rather than the densities:
-# mantle and crust densities come from material physics, and the core radius and
-# density are the two unknowns fixed by the observed mass and mean moment of
-# inertia. That makes `R_core` an output, checkable against the independent
-# geodetic inference of Hauck et al. (2013) — the same role core density plays in
-# `Mars`.
+# The *radii* are solved here, not the densities: mantle and crust densities are
+# inputs, and the core radius and density are the two unknowns closed by the
+# observed mass and mean moment of inertia. `R_core` is therefore an output.
+#
+# Without an inner core the fluid core reaches r=0, so it takes the non-AW
+# operator: the layer densities are constant (ρ₀′ = 0) and Adams-Williamson
+# would send κ→0 at the centre.
 
 """
     Mercury(; h_crust_km=26.0, r_inner_km=0.0, Cnd=0.346, ρ_mantle=3250.0,
@@ -17,8 +15,8 @@
               n_crust=25) -> PlanetModel
 
 Mercury from MESSENGER radio science and Earth-based radar: liquid Fe-S core
-`layers[1]`, silicate mantle, crust. Pass `r_inner_km > 0` to seat a solid inner
-core below the liquid, which shifts every layer index up by one.
+`layers[1]`, silicate mantle, crust. `r_inner_km > 0` seats a solid inner core
+below the liquid, which shifts every layer index up by one.
 
 | quantity | value | source |
 |---|---|---|
@@ -31,42 +29,24 @@ core below the liquid, which shifts every layer index up by one.
 | `k₂` | 0.464 ± 0.023 | Verma & Margot 2016, *JGR Planets* **121**, 1627 |
 | rotation period | 58.646 d (3:2 resonance) | Margot et al. 2012 |
 
-The moment-of-inertia target is the **mean** moment `I = C(1 − 2H/3)` with
-`H = J₂/(C/MR²)`, renormalised from the 2440 km reference radius to the mean
-radius, since the model is spherically symmetric. The flattening correction is
-only 1e-4 here — Mercury is far rounder than Mars — but it is applied for
-consistency with `Mars`.
+The moment target is the **mean** moment `I = C(1 − 2H/3)` with `H = J₂/(C/MR²)`,
+renormalised from the 2440 km reference radius of the gravity field to the mean
+radius, since the model is spherically symmetric.
 
-Mass and mean moment of inertia are matched exactly by construction. Two things
-are then left free and serve as the independent checks:
+Mass and mean moment are matched by construction; two outputs are left free and
+serve as the checks.
 
-- **`R_core` = 1994.5 km**, against the 2020 ± 30 km that Hauck et al. (2013),
-  *JGR Planets* **118**, 1204, obtain from the same observables through a wholly
-  different (thermodynamic Fe-S) route — agreement to 0.9σ, with no tuning against
-  it. The accompanying core density, 7253 kg/m³, is what a liquid Fe-S alloy
-  reaches at Mercury's core pressures.
-- **`k₂` = 0.489**, which depends only on the elastic moduli and so tests them.
-  Nothing in the fit saw it.
+- `R_core` = 1994.5 km, against the 2020 ± 30 km of Hauck et al. (2013), *JGR
+  Planets* **118**, 1204 — 0.9σ, with nothing tuned against it. Core density
+  7253 kg/m³.
+- `k₂` = 0.489, which depends only on the elastic moduli and is not seen by the
+  fit, against 0.464 ± 0.023.
 
-As with Mars, the published `k₂` determinations disagree by more than their quoted
-errors — 0.451 ± 0.014 (Mazarico et al. 2014), 0.464 ± 0.023 (Verma & Margot
-2016), 0.569 ± 0.025 (Genova et al. 2019, *GRL* **46**, 3625). The model's 0.489
-sits 1.1σ from Verma & Margot and 2.7σ from Mazarico et al., but 3.2σ below Genova
-et al.; `k₂` therefore pins the mantle rigidity only to a few tens of percent
-until that spread closes. BepiColombo's MORE and ISA
-experiments are expected to settle it, which is the point of having the forward
-model ready.
-
-`Cnd` is the knob for that argument. At the Margot et al. value 0.346 a uniform
-liquid core satisfies both observables at a plausible density. Push it to the
-Genova et al. (2019) 0.333 and the required core density rises to 8105 kg/m³,
-above what liquid Fe-S can reach at Mercury's core pressures — which is precisely
-their argument for a solid inner core. Pass `r_inner_km` to supply one.
-
-`ρ_mantle` moves `R_core` by about −20 km per +100 kg/m³; `h_crust_km` barely
-touches it. `μ_mantle` (Pa) is the single knob `k₂` is most sensitive to and does not
-enter the mass/moment solve at all, so it moves the tidal response without touching
-the structure.
+Knobs. `Cnd` is the moment target: lowering it raises the required core density
+(8105 kg/m³ at 0.333), and a value outside 6000–8000 kg/m³ warns. `ρ_mantle`
+moves `R_core` by about −20 km per +100 kg/m³, `h_crust_km` barely at all.
+`μ_mantle` (Pa) never enters the mass/moment solve, so it moves `k₂` without
+touching the structure.
 """
 function Mercury(; h_crust_km::Float64 = 26.0, r_inner_km::Float64 = 0.0,
                    Cnd::Float64 = 0.346, ρ_mantle::Float64 = 3250.0,
@@ -96,9 +76,8 @@ function Mercury(; h_crust_km::Float64 = 26.0, r_inner_km::Float64 = 0.0,
     xc = sqrt(B/A)
     ρ_f = ρ_mantle + A/xc^3                          # liquid core density
 
-    # A moment of inertia too close to the uniform-sphere 0.4 pushes the solved core
-    # out past the mantle top — at C/MR² = 0.4 it already exceeds the planet radius.
-    # The algebra returns that happily, so it is checked here.
+    # The closed form returns a core above the mantle top for a moment target near
+    # the uniform-sphere 0.4, so the geometry is checked rather than assumed.
     xc < xm || throw(ArgumentError(
         "Mercury: C/MR² = $Cnd with ρ_mantle = $ρ_mantle needs a core of radius " *
         "$(round(xc*R/1e3, digits=1)) km, at or above the base of the crust " *
@@ -111,8 +90,8 @@ function Mercury(; h_crust_km::Float64 = 26.0, r_inner_km::Float64 = 0.0,
         "the mantle (ρ_core = $(round(ρ_f, digits=0)) kg/m³) — a density inversion."))
     if !(6000 ≤ ρ_f ≤ 8000)
         @warn "Mercury: C/MR² = $Cnd requires ρ_core = $(round(ρ_f, digits=0)) kg/m³, \
-outside the 6000–8000 range liquid Fe-S can span at Mercury's core pressures. Genova et al. \
-(2019) read exactly this as evidence for a solid inner core — pass r_inner_km to add one." maxlog = 1
+outside the 6000–8000 range liquid Fe-S can span at Mercury's core pressures. Pass \
+r_inner_km to seat a solid inner core instead." maxlog = 1
     end
 
     # ── layers ───────────────────────────────────────────────────────────────

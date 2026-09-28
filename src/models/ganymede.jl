@@ -23,24 +23,17 @@ the published spreads for ocean-bearing Ganymede models (Macrì & Casotto 2025,
 
 **Two parameterisations.** By default the radii are frozen and the core and mantle
 densities are scaled to hit `M` and `C_nd`, so the shell thickness is paid for in core
-density: 7869 kg/m³ as `h_ice_km → 0`, 5991 at 84 km, 4996 at 134 km, and *lighter than
-the mantle* past **219.1 km**, which throws (outside 4500–7500 you get a warning). That
-is convenient for a single model but a poor family to sweep: `R_core` cannot move, so
-all the adjustment lands on density.
+density: 7869 kg/m³ as `h_ice_km → 0`, 4996 at 134 km, and lighter than the mantle past
+**219.1 km**, which throws (outside 4500–7500 warns).
 
-Pass `ρ_core` and/or `ρ_mantle` for the **standard** parameterisation instead —
-densities from material physics, radii solved from `M` and `C_nd`, as in Sohl,
-Hussmann, Vance and the Macrì & Casotto ensemble. With `ρ_core = 5500`,
-`ρ_mantle = 3300` the radii stay sensible across the whole hydrosphere range
-(`R_core` 828 → 559 km, `R_mantle` 1791 → 1881 km over `h_ice_km` 20 → 330) and
-nothing is strained. Prefer it whenever `h_ice_km` is a swept variable. The two agree
-closely on rotational quantities — free periods match to ≲1.5% — because `M` and
-`C_nd` already pin the moments the modes depend on.
+Pass `ρ_core` and/or `ρ_mantle` for the **standard** parameterisation instead:
+densities fixed, radii solved from `M` and `C_nd`. The radii then stay sensible across
+the whole hydrosphere range (`R_core` 828 → 559 km, `R_mantle` 1791 → 1881 km over
+`h_ice_km` 20 → 330), so prefer it whenever `h_ice_km` is swept. The two parameterisations
+agree on the free periods to ≲1.5%.
 
-`C_nd` is less certain than its formal error: it comes from Darwin–Radau, which
-non-hydrostatic stress can inflate by over 10% (Gao & Stevenson 2013, *Icarus*
-**226**, 1185), and the Juno reanalysis points to a larger true value (Gomez Casajus
-et al. 2022, *GRL* **49**, e2022GL099475).
+`Cnd` is a knob because the Darwin–Radau value carries more uncertainty than its formal
+error; Macrì & Casotto (2025) sample 0.25–0.35 rather than imposing it.
 
 `pressure_love(m; forcing_layer = 4)` gives the ocean's pressure Love numbers.
 """
@@ -51,10 +44,6 @@ function Ganymede(; h_ice_km::Float64 = 100.0, n_core::Int = 50, n_solid::Int = 
     Rc  = 720.0e3; Rm = 1820.0e3; Rhp = 2284.0e3
     Ro  = R - h_ice_km*1e3
 
-    # C_nd is far less certain than its formal error: Darwin–Radau can overestimate it
-    # by >10% under non-hydrostatic stress (Gao & Stevenson 2013) and the Juno reanalysis
-    # points to a larger value (Gomez Casajus et al. 2022). Macrì & Casotto (2025) decline
-    # to impose it at all, sampling 0.25–0.35. Pass `Cnd` to explore that.
     M_obs, Cnd_obs = 1.482e23, Cnd           # Anderson et al. 1996, Nature 384, 541
     ρ_hyd = (1346.0, 1100.0, 937.0)     # HP ice, ocean, shell
     ρ_ref = (5777.9, 3291.5)            # core, mantle — starting profile
@@ -91,16 +80,14 @@ function Ganymede(; h_ice_km::Float64 = 100.0, n_core::Int = 50, n_solid::Int = 
                 v5(1)*ρ_ref[1]  v5(2)*ρ_ref[2]] \ [M_obs - rest3, Cnd_obs*M_obs*R^2 - rest5]
         ρ_SI = (α*ρ_ref[1], β*ρ_ref[2], ρ_hyd...)            # ≈ 5662, 3313, …
 
-        # Here `h_ice_km` is not a free knob: M and C/MR² are pinned and the radii
-        # cannot move, so the shell thickness is paid for entirely in core density.
-        # Past 219.1 km the "core" comes out lighter than the mantle above it —
-        # gravitationally unstable, and every downstream quantity (flattening, Love
-        # numbers, compliances) is then meaningless. Pass `ρ_core`/`ρ_mantle` to sweep.
+        # The radii cannot move here, so the shell thickness is paid for entirely in
+        # core density; past 219.1 km the core comes out lighter than the mantle and
+        # the issorted check below throws.
         if !(4500 ≤ ρ_SI[1] ≤ 7500)
             @warn "Ganymede: h_ice_km = $h_ice_km forces ρ_core = $(round(ρ_SI[1], digits=0)) \
-kg/m³, outside the 4500–7500 range an Fe–FeS core could plausibly span (Fe–FeS is 5000–6000, \
-pure iron ≈ 7900). The radii are frozen, so shell thickness is paid for in core density — \
-pass ρ_core/ρ_mantle for the radii-free parameterisation instead." maxlog = 1
+kg/m³, outside the 4500–7500 range an Fe–FeS core can plausibly span. The radii are frozen, \
+so shell thickness is paid for in core density — pass ρ_core/ρ_mantle for the radii-free \
+parameterisation instead." maxlog = 1
         end
     end
 

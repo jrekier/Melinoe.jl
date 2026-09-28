@@ -3,11 +3,10 @@
 # core is layers[1], reaches the centre, and needs the non-AW fluid operator —
 # Adams-Williamson would give κ→0 at r=0.
 #
-# Geometry and bulk properties are taken from the literature (see the docstring),
-# and the core and mantle density profiles are then scaled by one factor each so
-# the model reproduces the observed mass and mean moment of inertia exactly. Both
-# factors come out within 1.3% of unity, and the resulting core density is checked
-# against the seismically inferred range.
+# Geometry and bulk properties are from the literature (see the docstring); the
+# core and mantle density profiles are then each scaled by one factor so the model
+# reproduces the observed mass and mean moment of inertia. Both factors come out
+# within 1.3% of unity.
 
 _polyfit(xs, ys, deg) = ([x^j for x in xs, j in 0:deg]) \ ys   # LS coeffs Σ cⱼx^j
 
@@ -30,16 +29,13 @@ The mean radius is the IAU 3389.5 km. The moment-of-inertia target used here is 
 **mean** moment `I = C(1 − 2H/3)` with `H = 0.005364`, renormalised to the mean
 radius, since the model is spherically symmetric — `I/(M R²) = 0.36401`.
 
-Mass and moment of inertia are matched exactly by construction; `k₂` is left free
-and is the independent check on the elastic moduli. The model gives `k₂ = 0.1784`,
-within 0.6σ of the Konopliv et al. (2020) `0.174 ± 0.008`. Note the published
-determinations disagree by more than their quoted errors — Konopliv et al. (2016)
-give `0.169 ± 0.006` and Genova et al. (2016) `0.1697 ± 0.0009` — so `k₂` pins the
-mantle rigidity only to a few percent.
+Mass and moment of inertia are matched by construction; `k₂` is left free and is
+the check on the elastic moduli. The model gives `k₂ = 0.1784`, 0.6σ from the
+Konopliv et al. (2020) value.
 
-`r_core_km` moves `k₂` strongly; `h_crust_km` barely touches it. Shrinking the core
-to lower `k₂` drives the core density above the 5700–6300 range, since mass and
-moment of inertia still have to be met.
+Knobs. `r_core_km` moves `k₂` strongly, `h_crust_km` barely at all; shrinking the
+core drives the core density above the 5700–6300 range, since mass and moment of
+inertia still have to be met.
 """
 function Mars(; h_crust_km::Float64 = 45.0, r_core_km::Float64 = 1830.0,
                 n_core::Int = 90, n_mantle::Int = 90, n_crust::Int = 25)

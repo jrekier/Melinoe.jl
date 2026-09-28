@@ -9,8 +9,8 @@
 #   Â = ∫ ρ₀ r⁴ dr   (whole Earth / fluid outer core)
 # Betti reciprocity  Â_tot·ξ = Â_f·γ  (Saito eq. 58) is returned as a check.
 
-# F(r) on layer i, from a solution vector. Written as r⁴δφ′ + 3ρ₀r⁴U − 2r³δφ (no
-# 0·∞) so a core reaching the centre, as on Mars, evaluates F(0) = 0 cleanly.
+# F(r) on layer i, from a solution vector. The grouping r⁴δφ′ + 3ρ₀r⁴U − 2r³δφ
+# contains no 0·∞ product, so a core reaching the centre gives F(0) = 0.
 function _F_at(x, layers, ops, ns, i, r)
     Ntot = sum(ns)
     cumN = cumsum([0; ns])

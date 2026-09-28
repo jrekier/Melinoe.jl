@@ -1,7 +1,7 @@
 # ── Pressure Love numbers ─────────────────────────────────────────────────────
 # Freezing the forcing layer drops its U and P columns, so the variable layout
-# differs from `assemble_planet` and this keeps its own assembler — reusing `Layer`,
-# `gravitoelastic_blocks` and the same σ_rr/σ_rθ stress forms.
+# differs from `assemble_planet` and this file keeps its own assembler. It reuses
+# `Layer`, `gravitoelastic_blocks` and the same σ_rr/σ_rθ stress forms.
 
 function _pressure_love(layers::Vector{Layer}, ℓ::Int; forcing_layer::Int, ω² = 0.0)
     L  = length(layers)
@@ -103,19 +103,18 @@ function _pressure_love(layers::Vector{Layer}, ℓ::Int; forcing_layer::Int, ω�
         σrθ_V(μ, ev, Dev) = -μ .* ev .+ μ .* r0 .* Dev
 
         # ── Frozen-layer interfaces (D&B 2004 eq. 41) ──────────────────────────
-        # The frozen fluid has no U of its own, but it is not at rest: it takes the
+        # The frozen fluid has no U column, but it is not at rest: it takes the
         # hydrostatic displacement U_f = −δφ/g₀ that holds its surface on an
-        # equipotential. The solid sits C₅ = U_s + δφ/g₀ off that surface, so U is
-        # apparently discontinuous here — D&B's "apparent jump in the radial
-        # displacement". Substituting C₅ leaves two rows, in L=below / R=above:
+        # equipotential. The solid is offset from that surface by C₅ = U_s + δφ/g₀,
+        # which makes U apparently discontinuous (D&B's "apparent jump in the radial
+        # displacement"). Substituting C₅ leaves two rows, with L=below / R=above:
         #
         #   σ_rr^s − ρ_f g₀ U_s − ρ_f δφ = −Ψ         traction, Ψ at the top of `fi`
         #   3(ρ_L − ρ_R) U_s + Dδφ_L − Dδφ_R = 0      mass-anomaly jump in δφ′
         #
         # The second carries the density *difference* against the solid's U alone,
         # where an ordinary junction below carries 3ρU on each side separately: the
-        # two δφ/g₀ pieces cancel. Setting U_f = 0 instead gives C₅ = U_s and quietly
-        # drops both the buoyancy and the mass-anomaly correction.
+        # two δφ/g₀ pieces cancel.
         if fro_R
             g0  = li.g₀(r0)
             rrow = row_U(i)[end]
@@ -254,28 +253,20 @@ end
 Response to a unit pressure applied at the top of an internal fluid layer. Returns
 `(; kP, hP, δφR, uR)`, where `kP = −δφ(R)` and `hP = u_r(R)`.
 
-Where the tidal Love numbers `h, k, l` answer *how does the body deform under an
-external gravitational potential*, these answer *how does it deform when its own
-fluid pushes on the solid above*. A core or a subsurface ocean moving relative to
-the shell — in a libration, wobble or nutation — presses on its ceiling; the solid
-yields, and the resulting change in the external gravity field feeds back into the
-rotational equations.
-
-This is not a standard Love number. The definition used here is the one introduced
-by Dumberry & Bloxham (2004), *Variations in the Earth's gravity field caused by
-torsional oscillations in the core*, *GJI* **159**(2), 417–434, eq. (41). Pressure at
-PREM's CMB reproduces their Table 2 at `ℓ = 2, 4, 6, 8` — within 0.25% for `ℓ ≥ 4`.
+The definition is Dumberry & Bloxham (2004), *Variations in the Earth's gravity
+field caused by torsional oscillations in the core*, *GJI* **159**(2), 417–434,
+eq. (41). This is not a standard Love number. Pressure at PREM's CMB reproduces their
+Table 2 at `ℓ = 2, 4, 6, 8`, within 0.25% for `ℓ ≥ 4`.
 
 `forcing_layer` must be fluid with a solid layer on either side. It is *frozen*:
 only the pressure it transmits to its boundaries matters, so its `U` and `P` leave
 the system and it contributes just Laplace's equation for `δφ`. Its `κ` therefore
 never enters, and an incompressible ocean gives a bit-identical `k_P`.
 
-At a frozen interface the radial displacement is *apparently discontinuous*: the
-fluid is taken to sit at the hydrostatic `U_f = −δφ/g₀` that keeps its surface on an
-equipotential, while the solid is offset from it by `C₅ = U_s + δφ/g₀`. This is D&B's
-"apparent jump in the radial displacement", and it is what makes the interface rows
-differ from an ordinary fluid–solid junction — see the comment at the assembly.
+The frozen interface rows differ from an ordinary fluid–solid junction. The fluid
+sits at the hydrostatic `U_f = −δφ/g₀` and the solid is offset from it by
+`C₅ = U_s + δφ/g₀`, D&B's "apparent jump in the radial displacement". Derived at
+the assembly.
 
 ```julia
 pressure_love(Melinoe.Models.Ganymede(); forcing_layer = 4)   # the ocean

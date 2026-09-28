@@ -1,9 +1,10 @@
 # ── Applied-potential body forcing ────────────────────────────────────────────
 #
-# An external potential Φ enters the momentum equations through ρ₀∇Φ — exactly how
-# δφ enters. So the RHS is f = −A_δφcol · vΦ, the δφ-column operators applied to Φ's
-# spectral coefficients and negated, on the interior U- and V-momentum rows only.
-# Poisson and BC rows take no forcing when ∇²Φ = 0, true for Φ ∝ r^ℓ.
+# An external potential Φ enters the momentum equations through ρ₀∇Φ, in the same
+# form as δφ. The RHS is therefore f = −A_δφcol · vΦ: the δφ-column operators
+# applied to Φ's spectral coefficients and negated, on the interior U- and
+# V-momentum rows only. Poisson and BC rows carry no forcing when ∇²Φ = 0, which
+# holds for Φ ∝ r^ℓ.
 
 """
     potential_forcing(ops, ns; ℓ, potential=(r->r^ℓ), amplitude=1.0,
@@ -31,7 +32,7 @@ function potential_forcing(ops, ns; ℓ::Int, potential = (r -> r^ℓ),
         f[rg.U_int] = -ops[i].A_Uφ[rg.U_op, :] * vΦ
         f[rg.V_int] = -ops[i].A_Vφ[rg.V_op, :] * vΦ
         # A_φΦ is nonzero only for Dahlen fluids, whose closed δφ equation carries
-        # a source; a harmonic Φ has none.
+        # a source term. A harmonic Φ contributes none.
         f[rg.δφ_int] = -ops[i].A_φΦ[rg.δφ_op, :] * vΦ
     end
     # Junction rows carrying a forcing RHS (Dahlen fluid boundaries). Already

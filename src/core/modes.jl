@@ -8,11 +8,11 @@
         -> (ωs, sorted_idx, vs, λs)
 
 Generalised eigensolve `A x = λ B x` (`λ = ω²`), ascending. `vs[:, sorted_idx]`
-are the kept eigenvectors; `λs` is everything, unfiltered.
+are the kept eigenvectors; `λs` holds every eigenvalue, unfiltered.
 
-Discarded: non-finite `λ`, from the zero rows of `B`; complex `λ`, since the
-problem is self-adjoint; and `λ ≤ tol_λmin`, junk clustered near zero rather than
-a physical band.
+Three classes are discarded: non-finite `λ`, produced by the zero rows of `B`;
+complex `λ`, excluded because the problem is self-adjoint; and `λ ≤ tol_λmin`,
+which cluster near zero and do not form a physical band.
 """
 function solve_modes(Amat, Bmat; tol_imag=1e-5, tol_abs=1e-8, tol_λmin=1e-4)
     λs, vs = eigen(Amat, Bmat)
