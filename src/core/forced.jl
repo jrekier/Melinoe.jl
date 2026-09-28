@@ -1,7 +1,8 @@
 # ── Composable forcing → forced response → field access ───────────────────────
 #
-# Assemble, force, read. `love_numbers` and `compliances` are thin recipes over
-# these three moves; `radial`/`tangential`/`potential` give the raw fields.
+# `forced` assembles the pencil, builds the body-force RHS and solves, keeping the
+# spectral field. `radial`, `tangential`, `potential` and `moment` read that field.
+# `love_numbers` and `compliances` are written in terms of both.
 
 abstract type Forcing end
 
@@ -21,7 +22,7 @@ Tilt(region; ε) = Tilt(region, ε)
 struct Potential <: Forcing; Φ::Function; amplitude::Float64; layers; end
 Potential(Φ; amplitude = 1.0, layers = :all) = Potential(Φ, amplitude, layers)
 
-"Superposition of forcings — solved in a single linear solve."
+"Superposition of forcings. Solved in one linear solve."
 struct Sum <: Forcing; parts::Vector{Forcing}; end
 Base.:+(a::Forcing, b::Forcing) = Sum(Forcing[a, b])
 Base.:+(a::Sum,     b::Forcing) = Sum([a.parts; b])
@@ -46,8 +47,8 @@ _spec(f::Tilt, m)        = (r -> -(2/3) * f.ε * r * _g(m, r), 1.0,         _mas
 _spec(f::Potential, m)   = (f.Φ,                              f.amplitude, _mask(m, f.layers))
 
 """
-A solved forced state, holding the spectral field `x = [U; V/P; δφ]`. Read it
-with `radial` / `tangential` / `potential` / `moment`.
+A solved forced response. Holds the spectral field `x = [U; V/P; δφ]`, read with
+`radial`, `tangential`, `potential` and `moment`.
 """
 struct Forced{T}
     x     :: Vector{T}
@@ -61,8 +62,8 @@ end
 """
     forced(model, forcing; ω²=0.0, ℓ=2) -> Forced
 
-Solve `(A − ω²B) y = f` for the body force of `forcing` on `model`, keeping the
-field. Forcings compose: `Tide() + Centrifugal(layers=:oc)` is one solve.
+Solve `(A − ω²B) y = f` for the body force of `forcing` on `model`. Summed
+forcings, e.g. `Tide() + Centrifugal(layers=:oc)`, share the single solve.
 """
 function forced(model::PlanetModel, fc::Forcing; ω² = 0.0, ℓ::Int = 2)
     A, B, ops, ns, jr = assemble_planet(model.layers, ℓ)
@@ -82,11 +83,12 @@ function _layerfun(d::Forced, f::Int, i::Int)
     Fun(d.ops[i].S, d.x[f*Ntot + cumN[i]+1 : f*Ntot + cumN[i+1]])
 end
 
-# Stitch per-layer callables into one piecewise function of radius. `layer_at`
-# throws out of range, since the per-layer `Fun`s extrapolate silently.
+# Per-layer callables as one piecewise function of radius. `layer_at` throws
+# outside the model; a per-layer `Fun` evaluated there returns an extrapolated
+# value with no error.
 _piecewise(d::Forced, funs) = r -> funs[layer_at(d.model, r)](r)
 
-"Radial displacement `U(r)`. `radial(d)` is a callable; `radial(d, r)` samples it."
+"Radial displacement `U(r)`. `radial(d)` returns the function, `radial(d, r)` its value at `r`."
 radial(d::Forced)    = _piecewise(d, [_layerfun(d, 0, i) for i in eachindex(d.ns)])
 radial(d::Forced, r) = radial(d)(r)
 
@@ -95,8 +97,8 @@ potential(d::Forced)    = _piecewise(d, [_layerfun(d, 2, i) for i in eachindex(d
 potential(d::Forced, r) = potential(d)(r)
 
 """
-Horizontal displacement `V(r)` (derived from the pressure field inside fluid
-layers). Undetermined at a static fluid surface — see `love_numbers`.
+Horizontal displacement `V(r)`, obtained from the pressure field inside fluid
+layers. Undetermined at a static fluid surface (see `love_numbers`).
 """
 function tangential(d::Forced)
     ℓ = d.ℓ
@@ -117,8 +119,8 @@ tangential(d::Forced, r) = tangential(d)(r)
 # ── named readers ─────────────────────────────────────────────────────────────
 
 """
-Surface Love numbers `(; h, l, k)` — the three fields evaluated at `R`.
-`l` is `NaN` for a static solve on a fluid-surfaced body (see `love_numbers`).
+Surface Love numbers `(; h, l, k)`: the three fields at `r = R`. `l` is `NaN` for
+a static solve on a fluid-surfaced body (see `love_numbers`).
 """
 function read_love(d::Forced)
     R = rightendpoint(d.model.layers[end].domain)
@@ -132,9 +134,9 @@ surface_potential(d::Forced) = potential(d, rightendpoint(d.model.layers[end].do
 """
     moment(d::Forced, region) -> c̃₃
 
-Equatorial moment-of-inertia increment `δI₁₃ + i δI₂₃` of a region — `:whole`, or
-a fluid-layer index / `:oc`. From the telescoping field
-`F = r⁴δφ′ + 3ρ₀r⁴U − 2r³δφ`; same `ℓ=2, m=1` normalization as `compliances`.
+Equatorial moment-of-inertia increment `δI₁₃ + i δI₂₃` for `region`: `:whole`,
+`:oc`, or a fluid-layer index. Evaluated from the telescoping field
+`F = r⁴δφ′ + 3ρ₀r⁴U − 2r³δφ`, with the `ℓ=2, m=1` normalization of `compliances`.
 """
 function moment(d::Forced, region)
     region === :whole && return (4π/3) * surface_potential(d)
