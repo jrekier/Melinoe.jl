@@ -5,10 +5,17 @@
 # matrix M(ω)=M0+ωM1 is Mathews–Herring–Buffett (Dehant & Mathews eq. 7.151); the
 # four roots are the FCN, FICN, Chandler wobble and inner-core wobble (ICW).
 #
-# Inputs are all computed from the model: the nine deformation compliances
-# (`sic_compliances`) and the gravitational coupling constants α1, α2, α3
-# (`sic_alphas`, Dehant & Mathews eq. 7.152). Validated on PREM: α's match MHB to
-# sub-percent, FICN = +474 d (observed +475), hydrostatic FCN = −459 d.
+# Every input comes from the model: the nine deformation compliances
+# (`sic_compliances`), the gravitational couplings α1, α2, α3, α_g (`sic_alphas`,
+# Dehant & Mathews eq. 7.152), and optionally the inner-core tilt compliances
+# (`sic_tilt_compliances`), placed by `_add_tilt!` per Dumberry (2009) eqs (28)–(37).
+# The inner-core row carries the (1−α₂) terms of his eqs (28)–(30), which follow from
+# the corrected torque Γ_s of his eq (21).
+#
+# Validated on elastic PREM against his Table 2 ELASTIC2: CW 400.5 d (400.6),
+# FCN −455.8 (−455.7), FICN 478.0 (478.7), ICW 2435 (2410); the α's match MHB to
+# sub-percent. That FICN is the K_ICB = 0 value; the observed ~1025 d needs ICB
+# surface tractions, which this matrix does not carry.
 
 """
     sic_alphas(m; ic_layer=1, oc_layer=2, Ω_SI=nothing) -> (; α1, α2, α3, α_g)
@@ -42,6 +49,8 @@ function sic_alphas(m::PlanetModel; ic_layer::Int = 1, oc_layer::Int = 2, Ω_SI 
     α2 = α1 - α3*α_g
     return (; α1, α2, α3, α_g)
 end
+
+A_over_Af(s) = 1 / s.AfA          # As/Af = (As/A)/(Af/A); here M1[2,4] wants (As/Af)
 
 # 4×4 MHB matrix M(ω)=M0+ωM1, variables (m̃, m̃_f, m̃_s, ñ_s).
 function _sic_matrices(s)
@@ -87,7 +96,20 @@ end
 _lumped_tilt(S14, S24, S34) =
     (S14 == 0 && S24 == 0 && S34 == 0) ? nothing :
     (Sg = (S14, S24, S34), Sp = (0.0, 0.0, 0.0))
-A_over_Af(s) = 1 / s.AfA          # As/Af = (As/A)/(Af/A); here M1[2,4] wants (As/Af)
+
+# Gather compliances, α's, moments and ellipticities for the SIC nutation matrix.
+function _sic_setup(m::PlanetModel; ic_layer::Int = 1, oc_layer::Int = 2, Ω_SI = nothing)
+    Ω_SI = rotation_rate(m, Ω_SI)
+    flt = flattening(m; Ω_SI)
+    xICB = rightendpoint(m.layers[ic_layer].domain)
+    xCMB = rightendpoint(m.layers[oc_layer].domain)
+    A, e   = _region_moment_e(m, flt, 0.0, 1.0)
+    Af, ef = _region_moment_e(m, flt, xICB, xCMB)
+    As, es = _region_moment_e(m, flt, 0.0, xICB)
+    c = sic_compliances(m; ic_layer, oc_layer, Ω_SI)
+    α = sic_alphas(m; ic_layer, oc_layer, Ω_SI)
+    return (; c, α, e, ef, es, AfA = Af/A, AsA = As/A, Ω_SI)
+end
 
 """
     sic_nutation_modes(m; ic_layer=1, oc_layer=2, Ω_SI=nothing, tilt=nothing,
@@ -113,20 +135,6 @@ ICW from 2435 d to 2730 d and leaves the other three modes alone.
 lumped `S_i4` of Dumberry (2008), correct where `m̃ + m̃_s = 0`, as in the ICW.
 They add on top of `tilt`.
 """
-# Gather compliances, α's, moments and ellipticities for the SIC nutation matrix.
-function _sic_setup(m::PlanetModel; ic_layer::Int = 1, oc_layer::Int = 2, Ω_SI = nothing)
-    Ω_SI = rotation_rate(m, Ω_SI)
-    flt = flattening(m; Ω_SI)
-    xICB = rightendpoint(m.layers[ic_layer].domain)
-    xCMB = rightendpoint(m.layers[oc_layer].domain)
-    A, e   = _region_moment_e(m, flt, 0.0, 1.0)
-    Af, ef = _region_moment_e(m, flt, xICB, xCMB)
-    As, es = _region_moment_e(m, flt, 0.0, xICB)
-    c = sic_compliances(m; ic_layer, oc_layer, Ω_SI)
-    α = sic_alphas(m; ic_layer, oc_layer, Ω_SI)
-    return (; c, α, e, ef, es, AfA = Af/A, AsA = As/A, Ω_SI)
-end
-
 function sic_nutation_modes(m::PlanetModel; ic_layer::Int = 1, oc_layer::Int = 2, Ω_SI = nothing,
                             tilt = nothing, S14 = 0.0, S24 = 0.0, S34 = 0.0)
     s = _sic_setup(m; ic_layer, oc_layer, Ω_SI); Ω_SI = s.Ω_SI
